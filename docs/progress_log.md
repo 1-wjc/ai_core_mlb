@@ -169,6 +169,9 @@
 | 10/21 | 포스트시즌은 Lahman 테이블(SeriesPost · *Post)만 사용, 경기 단위(Retrosheet)는 제외 | 시리즈 승자 · 우승팀 · 선수 포스트시즌 기록은 Lahman으로 충분, 출처 단일화 | 확정 |
 | 10/21 | JSON 변환은 로컬 Python 규칙으로만 (LLM 미사용) | 재현 가능, 수치 오류 방지 | 확정 |
 | 10/21 | `data/` 전체는 깃에서 제외, 직접 작성하는 지표 사전은 `build/metrics.json` | data는 전부 스크립트 생성물 | 확정 |
+| 10/21 | 채팅 `gpt-5.4-mini`, 임베딩 `text-embedding-3-large` (GMS OpenAI 호환 주소) | Claude는 GMS에서 Anthropic 주소로만 호출돼 명세서 지정 `langchain-openai` 밖. 임베딩 large가 한/영 같은 뜻 문장 코사인 0.446 (small 0.417) | 확정 |
+| 10/21 | 화면은 Streamlit 대신 Django (HTML/JS + JSON API) | F2013 심화와 같은 구조 | 확정 |
+| 10/21 | 팀 시즌 기록 문서는 그 시즌 소속 선수 범위마다 복사 색인 (임베딩은 1번) | `player_id` 필터 안에서 팀 성적 질문에 답하기 위해 | 확정 |
 | 10/21 | 근거 문서는 같은 수집 코드로 사전 배치 수집(JSON + manifest) + 질문 시 보충 | 속도 · API 장애 대비(F2004 단서), 재수집 방지(NF2002), 4.2 검증 증빙 유지 | 확정 |
 
 ---
@@ -180,6 +183,9 @@
 - [x] Wikidata 연결 — `collect/03_link_wikidata.py`, 한국어 이름 2,620명, 영어 문서 7,656명, **한국어 문서 1,466명(= 한/영 모두 있음, 항목 후보)**, 그중 약 1,000자 이상 976명
 - [x] JSON 변환 — `build/01_build_players.py` 1,466명, `build/02_build_record_docs.py` 15,946건. 공개 값 대조: 류현진 2019 ERA+ 178 (B-Ref 179) · 트라웃 2016 OPS+ 176
 - [x] 위키 문서 수집 — `collect/04_collect_player_wiki.py`, 2,932건 실패 0 (한국어 1,466 · 본문 중앙값 391자 / 영어 1,466 · 중앙값 7,228자, 각주 · 외부 링크 등 참고 절 제외)
+- [x] 기본 뼈대 — `rag/config.py` · `prompts.py` · `indexer.py` · `graph.py`, `scripts/ask.py`. 선수 5명 소량 색인 (메타 5 · 문서 청크 548, 재색인 시 새로 쓰기 0 · 건수 불변)
+- [ ] 검색 편중: 시즌 질문에서 비슷한 다른 시즌 기록 문서가 위키 서술을 밀어냄 (류현진 2019 질문 → 근거 6개 모두 기록 문서) → 출처별 할당 또는 시즌 필터 검토
+- [ ] 전체 색인 (`--all`)
 - [ ] 지표 사전 `build/metrics.json`
 - [ ] 항목 선정 기준 최종 확정 (1,466명 전체 vs 한국어 문서 약 1,000자 이상 976명)
 - [ ] GMS 임베딩 모델 종류와 교차 언어 검색 적중률 (`.env` 필요)

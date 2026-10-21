@@ -1,0 +1,17 @@
+# 명세서 지정 버전 (streamlit 대신 Django 사용)
+langchain==1.3.14
+langgraph==1.2.10
+langsmith==0.10.17
+langchain-core==1.6.0
+langchain-openai==1.4.3
+langchain-community==0.4.2
+langchain-chroma==1.1.0
+langchain-text-splitters==1.1.2
+chromadb==1.5.9
+openai==2.54.0
+requests==2.34.2
+python-dotenv==1.2.3
+typing-extensions==4.16.0
+
+# 화면 (F2013: HTML/CSS/JS + JSON API)
+Django==5.2.18
