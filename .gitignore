@@ -1,0 +1,32 @@
+# ---- 비밀 정보 (NF2003: API 키는 환경변수로, 저장소에 포함하지 않음) ----
+.env
+.env.*
+!.env.example
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# ---- 데이터 (collect/ → build/ 스크립트로 다시 만들 수 있음) ----
+# 원천(data/raw) · 정규화 결과(data/processed) · 색인(data/index)
+data/
+
+# ---- 프로젝트에 사용하지 않는 것 ----
+# 제공 영화 도메인 팩과 그 분석 스크립트
+영화도메인_데이터/
+analysis/
+# 명세서 원본 (對外秘)
+*.pdf
+
+# ---- 색인 · 캐시 (색인 스크립트로 다시 만들 수 있음) ----
+chroma_db/
+*.sqlite3
+
+# ---- 에디터 · OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
