@@ -85,6 +85,9 @@ COUNTRY_KO = {
     "Brazil": "브라질", "Germany": "독일", "Honduras": "온두라스", "Jamaica": "자메이카",
     "V.I.": "미국령 버진아일랜드", "Virgin Islands": "미국령 버진아일랜드", "United Kingdom": "영국",
     "Italy": "이탈리아", "South Africa": "남아프리카 공화국", "Lithuania": "리투아니아", "Peru": "페루",
+    # Lahman 표기 그대로인 값
+    "D.R.": "도미니카 공화국", "México": "멕시코", "CAN": "캐나다", "Curaçao": "퀴라소",
+    "Soviet Union": "소련", "West Germany": "서독", "U.S. Virgin Islands": "미국령 버진아일랜드", "Spain": "스페인",
 }
 
 BATS_KO = {"R": "우타", "L": "좌타", "B": "양타"}

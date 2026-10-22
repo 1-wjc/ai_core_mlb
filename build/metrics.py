@@ -116,6 +116,9 @@ def pitching_metrics(s, rates=None, park=None):
         "BB_pct": rnd(bb_pct * 100 if bb_pct is not None else None, 1),
         "K_BB_pct": rnd((k_pct - bb_pct) * 100 if k_pct is not None and bb_pct is not None else None, 1),
         "BABIP": rnd(div(H - HR, BFP - SO - HR - BB - HBP - SH), 3),
+        # 피안타율 · 피출루율 (타격방해 출루는 데이터에 없어 빼지 못함). 피장타율은 피2루타 · 피3루타가 없어 계산 불가
+        "BAA": rnd(div(H, BFP - BB - HBP - SH - s["SF"]), 3),
+        "OBP_against": rnd(div(H + BB + HBP, BFP), 3),
         "FIP": rnd(fip, 2),
         "ERA_plus": rnd(era_plus, 0), "ERA_minus": rnd(era_minus, 0), "FIP_minus": rnd(fip_minus, 0),
     }

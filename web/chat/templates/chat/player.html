@@ -1,0 +1,147 @@
+{% extends "chat/base.html" %}
+{% load static %}
+{% block title %}{{ p.name_ko }} · MLB 기록 랩{% endblock %}
+{% block content %}
+
+
+<div class="layout player-layout">
+  <div>
+    {# 선수 소개 — 왼쪽 열 맨 위. 오른쪽 질문 패널이 이 높이부터 나란히 시작한다 #}
+    <section class="hero player-hero">
+  <div class="kicker">{{ p.primary_position }}{% if p.two_way %} · 투타겸업{% endif %} · {{ p.first_season }}–{{ p.last_season }}</div>
+  <h1>{{ p.name_ko }}<span class="en">{{ p.name_en }}</span></h1>
+  <p class="lead">{{ p.throws }}{{ p.bats }} · {{ p.birth_year }}년생 · {{ p.birth_country }} · {{ p.teams|join:" / " }}</p>
+  <div class="chips">
+    {% if p.hall_of_fame %}<span class="chip accent">명예의 전당</span>{% endif %}
+    {% for s in p.postseason_summary %}{% if "우승" in s %}<span class="chip win">🏆 {{ s }}</span>{% endif %}{% endfor %}
+    {% if p.allstar_years %}<span class="chip">올스타 {{ p.allstar_years|length }}회</span>{% endif %}
+  </div>
+</section>
+
+    {% if tiles %}
+    <div class="tiles">
+      {% for k, v in tiles %}<div class="tile"><div class="v">{{ v }}</div><div class="k">{{ k }}</div></div>{% endfor %}
+    </div>
+    <p class="note">통산 · 1990–2025 시즌 범위 · 출처 SABR Lahman Database, 지표는 로컬 계산</p>
+    {% endif %}
+
+    {% if p.traits or p.awards %}
+    <section class="section">
+      <h2 class="section-title">특징 · 수상</h2>
+      <div class="card">
+        {% if p.traits %}<div class="chips" style="margin-top:0">{% for t in p.traits %}<span class="chip accent">{{ t }}</span>{% endfor %}</div>{% endif %}
+        {% if p.awards %}
+        <div class="chips">{% for a in p.awards %}<span class="chip">{{ a }}</span>{% endfor %}</div>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">통산 기록</h2>
+        <div class="tv-outline" data-tabs="career" role="tablist" aria-label="통산 기록 구분">
+          {% for key, label in career_tabs %}<button type="button" role="tab" data-tab="{{ key }}" class="{% if forloop.first %}on{% endif %}">{{ label }}</button>{% endfor %}
+        </div>
+      </div>
+      {% for key, label in career_tabs %}
+      <div class="card" data-panel-career="{{ key }}" {% if not forloop.first %}hidden{% endif %}>
+        {% for tab_key, blocks in career.items %}{% if tab_key == key %}
+        <div class="detail-grid">
+          {% for kind_label, rows in blocks %}
+          <div>{% if blocks|length > 1 %}<h3 class="detail-kind">{{ kind_label }}</h3>{% endif %}
+            <table class="kv"><tbody>{% for l, v in rows %}<tr><th>{{ l }}</th><td>{{ v }}</td></tr>{% endfor %}</tbody></table></div>
+          {% endfor %}
+        </div>
+        {% endif %}{% endfor %}
+      </div>
+      {% endfor %}
+      <p class="note">통산 · 1990–2025 시즌 범위 · 수비 기록은 시즌별로만 있습니다</p>
+    </section>
+
+
+  </div>
+
+  <aside class="aside">
+    <div class="aside-actions"><a class="btn ghost" href="{% url 'compare' %}?a={{ p.player_id }}">다른 선수와 비교 →</a></div>
+    {% with player_id=p.player_id hint="기록과 위키백과 문서를 근거로 답하고, 답변에 사용한 근거를 표시합니다." %}
+    {% include "chat/_ask.html" %}
+    {% endwith %}
+  </aside>
+</div>
+
+{# 시즌별 기록 — 전체 너비. 2단 레이아웃이 여기서 끝나므로 질문 패널 고정도 여기서 풀린다 #}
+<section class="section season-full">
+  <div class="section-head">
+    <h2 class="section-title">시즌별 기록</h2>
+    <div class="seg-slider" data-stype role="tablist" aria-label="시즌 구분">
+      <span class="knob"></span>
+      <button type="button" role="tab" class="on" data-type="regular">정규시즌 {{ regular_count }}</button>
+      <button type="button" role="tab" data-type="post" {% if not post_count %}disabled{% endif %}>포스트시즌 {{ post_count }}</button>
+    </div>
+    <div class="tv-outline" data-tabs="season" role="tablist" aria-label="시즌 기록 구분">
+      {% for key, label in season_tabs %}<button type="button" role="tab" data-tab="{{ key }}" class="{% if forloop.first %}on{% endif %}">{{ label }}</button>{% endfor %}
+    </div>
+  </div>
+  {% for kind, tab, t in season_tables %}
+  <div class="card" data-season="{{ kind }}" data-view="{{ tab }}" {% if kind != "regular" or tab != "basic" %}hidden{% endif %}>
+    {% if t.rows %}
+    <div class="table-wrap">
+      <table class="season-table">
+        <thead>
+          <tr class="group-row">
+            <th class="sticky" rowspan="2">시즌</th><th class="l" rowspan="2">구단</th>
+            {% if kind == "post" %}<th class="l" rowspan="2">진출 라운드</th>{% endif %}
+            {% for g, span in t.groups %}<th class="grp" colspan="{{ span }}">{{ g }}</th>{% endfor %}
+          </tr>
+          <tr>{% for h in t.headers %}<th>{{ h }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          {% for r in t.rows %}
+          <tr><td class="sticky">{{ r.season }}</td><td class="l">{{ r.teams }}</td>{% if kind == "post" %}<td class="l">{{ r.rounds }}</td>{% endif %}{% for c in r.cells %}<td>{{ c }}</td>{% endfor %}</tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">{% if tab == "fielding" and kind == "post" %}포스트시즌 수비 기록은 데이터에 없습니다.{% else %}기록이 없습니다.{% endif %}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <p class="note">포스트시즌은 리그 기준값이 없어 OPS+ · ERA+ · FIP · ERA− · FIP− 를 표시하지 않습니다 · 출처 SABR Lahman Database, 지표는 로컬 계산 ·
+    <a href="{{ p.ko_wiki.url }}" target="_blank" rel="noopener">한국어 위키백과</a> · <a href="{{ p.en_wiki.url }}" target="_blank" rel="noopener">영어 위키백과</a></p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  // 통산: 기본 · 세이버 · 상세 탭 / 시즌별: 정규 · 포스트(슬라이드) × 기본 · 세이버 · 상세 · 수비(탭)
+  (function () {
+    const careerTabs = document.querySelector('[data-tabs="career"]');
+    careerTabs.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      careerTabs.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      document.querySelectorAll("[data-panel-career]").forEach((el) => { el.hidden = el.dataset.panelCareer !== b.dataset.tab; });
+    }));
+
+    const slider = document.querySelector("[data-stype]");
+    const seasonTabs = document.querySelector('[data-tabs="season"]');
+    const now = { type: "regular", view: "basic" };
+    function show() {
+      document.querySelectorAll("[data-season]").forEach((el) => {
+        el.hidden = !(el.dataset.season === now.type && el.dataset.view === now.view);
+      });
+    }
+    slider.querySelectorAll("button").forEach((b, i) => b.addEventListener("click", () => {
+      slider.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      slider.style.setProperty("--pos", i);
+      now.type = b.dataset.type;
+      show();
+    }));
+    seasonTabs.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      seasonTabs.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      now.view = b.dataset.tab;
+      show();
+    }));
+  })();
+</script>
+<script src="{% static 'chat/ask.js' %}"></script>
+{% endblock %}

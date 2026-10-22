@@ -1,0 +1,17 @@
+<div class="ask" id="ask-panel" data-player="{{ player_id }}" data-compare="{{ compare_id|default:'' }}">
+  <div class="ask-head">
+    <strong>질문하기</strong>
+    <span class="mode" id="ask-mode">확인 중</span>
+  </div>
+  <div class="ask-sub"><span id="ask-count">색인 확인 중</span><button type="button" class="link-btn" id="ask-clear">대화 지우기</button></div>
+  <div class="ask-body" id="ask-messages">
+    <p class="ask-hint">{{ hint }}</p>
+  </div>
+  <div class="ask-foot">
+    <form class="ask-form" id="ask-form">
+      <input class="field" id="ask-input" type="text" placeholder="질문을 입력하세요" autocomplete="off" required>
+      <button class="btn" type="submit" aria-label="보내기">↑</button>
+    </form>
+    <div class="suggest">{% for s in suggestions %}<button type="button" class="ask-suggest">{{ s }}</button>{% endfor %}</div>
+  </div>
+</div>

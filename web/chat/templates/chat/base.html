@@ -1,0 +1,36 @@
+{% load static %}<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}MLB 기록 랩{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="{% static 'chat/style.css' %}" rel="stylesheet">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="{% url 'home' %}"><b>●</b> MLB 기록 랩</a>
+      <nav class="top-links">
+        <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name != 'compare' %}on{% endif %}">선수</a>
+        <a href="{% url 'compare' %}" class="{% if request.resolver_match.url_name == 'compare' %}on{% endif %}">비교</a>
+        <a href="{% url 'explore_page' %}" class="{% if request.resolver_match.url_name == 'explore_page' %}on{% endif %}">조건 탐색</a>
+      </nav>
+      <form class="top-search" method="get" action="{% url 'home' %}" role="search">
+        <input type="search" name="q" placeholder="선수 검색" aria-label="선수 검색">
+      </form>
+    </div>
+  </header>
+
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>기록 <a href="https://sabr.org/lahman-database/" target="_blank" rel="noopener">SABR Lahman Database</a> (CC BY-SA 3.0) · 문서 위키백과 (CC BY-SA 4.0)</span>
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

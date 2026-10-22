@@ -1,0 +1,105 @@
+{% extends "chat/base.html" %}
+{% load static %}
+{% block title %}MLB 기록 랩{% endblock %}
+{% block content %}
+{# ---------- 선수 검색 (메인) ---------- #}
+<section class="hero home-hero">
+  <div class="kicker">MLB 1990–2025 시즌 · 선수 {{ player_total|floatformat:"0g" }}명</div>
+  <h1>선수 검색</h1>
+  <p class="lead">선수를 찾아 기록을 보고, 기록 데이터와 위키백과 문서를 근거로 질문할 수 있습니다.</p>
+  <form class="home-search" id="home-search" method="get" action="{% url 'home' %}" role="search" autocomplete="off">
+    <input class="field" id="home-q" name="q" value="{{ q }}" placeholder="선수 이름 (한글 · 영문)" aria-label="선수 검색">
+    <button class="btn" type="submit">검색</button>
+    <ul class="suggest-list" id="home-suggest" role="listbox" hidden></ul>
+  </form>
+</section>
+
+{# ---------- 질문 예시 (3번) ---------- #}
+<section class="section">
+  <h2 class="section-title">이렇게 물어보세요</h2>
+  <div class="ticker card" id="ticker">
+    {% for e in examples %}
+    <a class="ticker-item{% if forloop.first %} on{% endif %}"
+       href="{% if e.compare %}{% url 'compare' %}?a={{ e.id }}&b={{ e.compare }}&ask={{ e.q|urlencode }}{% else %}{% url 'player' e.id %}?ask={{ e.q|urlencode }}{% endif %}">
+      <span class="ticker-who">{{ e.name }}</span>
+      <span class="ticker-q">“{{ e.q }}”</span>
+      <span class="ticker-go">질문하기 →</span>
+    </a>
+    {% endfor %}
+    <div class="ticker-dots">{% for e in examples %}<button type="button" data-i="{{ forloop.counter0 }}" aria-label="예시 {{ forloop.counter }}" class="{% if forloop.first %}on{% endif %}"></button>{% endfor %}</div>
+  </div>
+</section>
+
+{# ---------- 시즌 타임라인 (2번) ---------- #}
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">시즌 타임라인</h2>
+    <span class="note" style="margin:0">수상 · 개인 1위는 이 서비스 선수 {{ player_total|floatformat:"0g" }}명 기준</span>
+  </div>
+  <div class="card timeline">
+    <div class="tl-controls">
+      <button type="button" class="tl-step" id="tl-prev" aria-label="이전 해">‹</button>
+      <div class="tl-track" id="tl-track">
+        <input type="range" id="tl-range" min="1990" max="2025" value="2025" aria-label="연도 선택">
+        <span class="tl-thumb" id="tl-year" aria-hidden="true">2025</span>
+      </div>
+      <button type="button" class="tl-step" id="tl-next" aria-label="다음 해">›</button>
+    </div>
+    <div class="tl-grid" id="tl-grid"></div>
+  </div>
+</section>
+
+{# ---------- 전체 선수 ---------- #}
+<section class="section" id="players">
+  <div class="section-head">
+    <h2 class="section-title">
+      {% if q %}“{{ q }}” 검색 결과{% elif team_name %}{{ team_name }} 선수{% else %}전체 선수{% endif %}
+      <span class="section-sub">{{ total|floatformat:"0g" }}명</span>
+    </h2>
+    {% if q %}<a class="note" style="margin:0" href="{{ clear_q }}">검색 지우기</a>{% endif %}
+  </div>
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <div class="seg-slider" style="--n: 3; --pos: {{ role_pos }}" role="tablist" aria-label="역할">
+        <span class="knob"></span>
+        {% for label, href, on in role_tabs %}<a href="{{ href }}" class="{% if on %}on{% endif %}">{{ label }}</a>{% endfor %}
+      </div>
+      <form method="get" action="#players" class="team-form">
+        {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+        {% if role %}<input type="hidden" name="role" value="{{ role }}">{% endif %}
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <select name="team" class="team-select" aria-label="구단 선택" onchange="this.form.submit()">
+          <option value="">전체 구단</option>
+          {% for abbr, name in team_options %}<option value="{{ abbr }}" {% if abbr == team %}selected{% endif %}>{{ abbr }} · {{ name }}</option>{% endfor %}
+        </select>
+      </form>
+    </div>
+    <div class="seg-slider" style="--pos: {{ sort_pos }}" aria-label="정렬">
+      <span class="knob"></span>
+      {% for label, href, on in sort_tabs %}<a href="{{ href }}" class="{% if on %}on{% endif %}">{{ label }}</a>{% endfor %}
+    </div>
+  </div>
+  {% if page.object_list %}
+  <div class="grid">
+    {% for r in page.object_list %}
+    <a class="pcard" href="{% url 'player' r.player_id %}" style="--c: {% if r.role == '투수' %}var(--accent){% else %}var(--orange){% endif %}">
+      <span class="pos"><span class="dot"></span>{{ r.position }}</span>
+      <span class="name">{{ r.name_ko }}</span>
+      <span class="en">{{ r.name_en }}</span>
+      <span class="meta">{{ r.first_season }}–{{ r.last_season }} · {{ r.teams }}{% if r.awards %} · 수상 {{ r.awards }}{% endif %}</span>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="pager">
+    {% if prev_link %}<a href="{{ prev_link }}">‹ 이전</a>{% endif %}
+    <span>{{ page.number }} / {{ page.paginator.num_pages }}</span>
+    {% if next_link %}<a href="{{ next_link }}">다음 ›</a>{% endif %}
+  </div>
+  {% else %}
+  <p class="empty">조건에 맞는 선수가 없습니다.</p>
+  {% endif %}
+</section>
+
+{{ timeline|json_script:"timeline-data" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'chat/home.js' %}"></script>{% endblock %}

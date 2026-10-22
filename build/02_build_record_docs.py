@@ -18,6 +18,7 @@ import os
 import time
 
 import lahman_loader as L
+import metrics as MET
 import names_ko as K
 from seasons import compute_all
 
@@ -135,7 +136,9 @@ def main():
                 stats["pitching"] = pit["stats"]
                 metrics["pitching"] = pit["metrics"]
             if season["fld"]:
-                metrics["fielding"] = {"pos": season["fld"]["pos"], **season["fld"]["metrics"]}
+                f = season["fld"]
+                metrics["fielding"] = {"pos": f["pos"], **f["stats"], "IP": MET.ip_text(f["stats"]["InnOuts"]),
+                                       "TC": f["stats"]["PO"] + f["stats"]["A"] + f["stats"]["E"], **f["metrics"]}
             docs.append({
                 "doc_id": f"rec:{bbref}:{year}:regular",
                 "title": f"{name_ko} {year} 정규시즌 기록",
@@ -237,6 +240,7 @@ def main():
             "doc_type": "team_season",
             "player_id": "",
             "team_id": team_id,
+            "team_abbr": t["teamIDBR"],           # 그해 팀 약자 (Baseball-Reference 기준, 예: LAD · MON · FLA)
             "franch_id": t["franchID"],
             "related_player": "",
             "season": year,

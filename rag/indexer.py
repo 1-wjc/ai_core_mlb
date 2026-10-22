@@ -1,6 +1,7 @@
-# 색인 — 컬렉션 2개 (F2002 · F2005)
+# 색인 — 컬렉션 2개 (F2002 · F2005 · F2016)
 #   player_meta : 선수 1명 = 청크 1개, ID = player_id
-#   player_docs : 기록 문서(1문서 = 1청크) + 위키 문서(청킹), ID = player_id:문서ID:순번
+#   player_docs : 기록 문서(1문서 = 1청크) + 위키 문서(청킹) + 지표 사전(지표 1개 = 1청크), ID = 항목ID:문서ID:순번
+#                 지표 사전은 특정 선수 항목이 아니므로 항목ID 자리에 _glossary 를 쓴다
 #
 # 실행
 #   python -m rag.indexer --players ryuhy01,troutmi01     # 일부 선수만 (흐름 확인용)
@@ -107,6 +108,29 @@ def wiki_chunks(pid, wiki_files, splitter):
     return chunks
 
 
+GLOSSARY_ID = "_glossary"
+
+
+def metric_chunks():
+    """지표 사전(build/metrics.json) — 지표 1개 = 청크 1개 (출처 종류: 지표 사전)"""
+    with open(C.METRICS_DICT_PATH, encoding="utf-8") as f:
+        metrics = json.load(f)["metrics"]
+    chunks = []
+    for m in metrics:
+        lines = [f"[지표 사전] {m['name_ko']} ({m['name_en']}) · 다른 이름: {', '.join(m['aliases'])} · 적용: {m['applies_to']}",
+                 f"정의: {m['description']}", f"계산식: {m['formula']}", f"해석: {m['better']}"]
+        if m.get("service_note"):
+            lines.append(f"이 서비스의 계산: {m['service_note']}")
+        if m["needs_league"]:
+            lines.append("리그 기준값이 필요한 지표 (포스트시즌은 계산하지 않음)")
+        doc_id = f"metric-{m['metric_id']}"
+        meta = {"player_id": GLOSSARY_ID, "doc_id": doc_id, "seq": 0, "title": f"지표 사전: {m['name_ko']}",
+                "url": m["reference"]["url"], "source": "지표 사전", "doc_type": "metric", "metric_id": m["metric_id"],
+                "aliases": "|".join(m["aliases"]), "related_player": ""}
+        chunks.append({"id": f"{GLOSSARY_ID}:{doc_id}:0", "text": "\n".join(lines), "meta": clean_meta(meta)})
+    return chunks
+
+
 # ---------------- 저장 (바뀐 것만 임베딩) ----------------
 def upsert(collection, chunks, embeddings, cache):
     """cache: {텍스트: 벡터} — 같은 팀 문서처럼 텍스트가 같은 청크는 한 번만 임베딩"""
@@ -135,6 +159,15 @@ def remove_stale(collection, pid, keep_ids):
     if stale:
         collection.delete(ids=stale)
     return len(stale)
+
+
+def index_wiki_files(player_id, paths):
+    """질문 시 보충 수집한 위키 문서를 선수 범위로 청킹 · 색인 (F2004). 색인한 청크 수를 돌려준다"""
+    _, docs_col = get_collections()
+    splitter = RecursiveCharacterTextSplitter(chunk_size=C.CHUNK_SIZE, chunk_overlap=C.CHUNK_OVERLAP)
+    chunks = wiki_chunks(player_id, paths, splitter)
+    upsert(docs_col, chunks, get_embeddings(), {})
+    return len(chunks)
 
 
 # ---------------- 실행 ----------------
@@ -177,7 +210,13 @@ def main():
     written, embedded = upsert(meta_col, meta_chunks, embeddings, cache)
     print(f"[player_meta] 청크 {len(meta_chunks):,} · 새로 쓰기 {written:,} · 임베딩 {embedded:,}")
 
-    # 2) 외부 문서 컬렉션 (선수 단위)
+    # 2) 지표 사전 (외부 문서 컬렉션, 항목 ID 자리 = _glossary)
+    glossary = metric_chunks()
+    written, embedded = upsert(docs_col, glossary, embeddings, cache)
+    stale = remove_stale(docs_col, GLOSSARY_ID, {c["id"] for c in glossary})
+    print(f"[지표 사전] 청크 {len(glossary):,} · 새로 쓰기 {written:,} · 임베딩 {embedded:,} · 삭제 {stale}")
+
+    # 3) 외부 문서 컬렉션 (선수 단위)
     total = {"record": 0, "wiki": 0, "written": 0, "embedded": 0, "stale": 0}
     for n, p in enumerate(players, 1):
         pid = p["player_id"]

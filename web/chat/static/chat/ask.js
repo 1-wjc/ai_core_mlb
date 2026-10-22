@@ -1,0 +1,137 @@
+// 질문 패널 — 이름 → player_id 변환(datalist), /api/ask 질문 · 인용 근거만 표시(F2008),
+//      대화 기록은 선수(비교 시 조합)별로 브라우저에 저장하고 직전 대화를 서버로 보낸다 (F2009)
+
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderMarkdown(text) {
+    return escapeHtml(text)
+      .split(/\n{2,}/)
+      .map((p) => "<p>" + p.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>") + "</p>")
+      .join("");
+  }
+
+  // ---------- 비교 선수 고르기 ----------
+  function idForName(name) {
+    for (const o of document.querySelectorAll("#player-options option")) {
+      if (o.value === name.normalize("NFC")) return o.dataset.id;
+    }
+    return "";
+  }
+
+  const pick = $("pick-form");
+  if (pick) {
+    pick.addEventListener("submit", (e) => {
+      for (const [nameId, hiddenId] of [["a-name", "a-id"], ["b-name", "b-id"]]) {
+        const field = $(nameId);
+        const id = idForName(field.value.trim());
+        if (!id) { e.preventDefault(); field.classList.add("invalid"); field.focus(); return; }
+        field.classList.remove("invalid");
+        $(hiddenId).value = id;
+      }
+    });
+  }
+
+  // ---------- 질문 패널 ----------
+  const panel = $("ask-panel");
+  if (!panel) return;
+  const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || "";
+  const box = $("ask-messages");
+  let first = true;
+  const storeKey = `mlb-lab:${panel.dataset.player}|${panel.dataset.compare || ""}`;
+  function loadLog() { try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); } catch (e) { return []; } }
+  function saveLog(log) { try { localStorage.setItem(storeKey, JSON.stringify(log.slice(-40))); } catch (e) { /* 저장 불가 */ } }
+  const log = loadLog();
+
+  fetch("/api/status").then((r) => r.json()).then((s) => {
+    const mode = $("ask-mode");
+    mode.textContent = s.mode === "RAG" ? "RAG" : "기록 검색";
+    if (s.mode === "RAG") mode.classList.add("rag");
+    const count = $("ask-count");
+    if (count) count.textContent = `색인: 선수 ${(s.index_meta || 0).toLocaleString()} · 문서 청크 ${(s.index_docs || 0).toLocaleString()}`;
+    if (s.notice) box.insertAdjacentHTML("afterbegin", `<p class="notice">${escapeHtml(s.notice)}</p>`);
+  }).catch(() => { $("ask-mode").textContent = "연결 안 됨"; });
+
+  function bubble(html, who) {
+    if (first) { box.querySelectorAll(".ask-hint").forEach((el) => el.remove()); first = false; }
+    const div = document.createElement("div");
+    div.className = `bubble ${who}`;
+    div.innerHTML = html;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+    return div;
+  }
+
+  function sourcesHtml(data) {
+    const used = data.sources.filter((s) => data.cited.includes(s.n));
+    if (!used.length) return '<div class="steps" style="margin-top:8px">답변에 인용된 근거가 없습니다.</div>';
+    const items = used.map((s) =>
+      `<li><span class="src-tag">[${s.n}] ${escapeHtml(s.source)}</span>` +
+      `<a href="${encodeURI(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.title)}</a></li>`).join("");
+    return `<details><summary>근거 ${used.length}건</summary><ol>${items}</ol></details>`;
+  }
+
+  function answerHtml(data) {
+    return `<div class="steps">${escapeHtml(data.steps.join(" · "))} · ${data.elapsed}초</div>${renderMarkdown(data.answer)}${sourcesHtml(data)}`;
+  }
+
+  // 저장된 대화 다시 그리기
+  for (const m of log) {
+    if (m.role === "user") bubble(escapeHtml(m.content), "me");
+    else if (m.data) bubble(answerHtml(m.data), "bot");
+  }
+
+  async function ask(question) {
+    const previous = log.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    bubble(escapeHtml(question), "me");
+    const pending = bubble('<span class="typing"><i></i><i></i><i></i></span>', "bot");
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({ player_id: panel.dataset.player, compare_id: panel.dataset.compare, question, history: previous }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        pending.innerHTML = answerHtml(data);
+        // 질문과 답을 답변이 온 뒤 함께 저장 (답을 받기 전에 페이지를 떠나면 질문만 남지 않게)
+        log.push({ role: "user", content: question }, { role: "assistant", content: data.answer, data });
+        saveLog(log);
+      } else {
+        pending.innerHTML = `<p style="color:var(--red)">${escapeHtml(data.error || "답변을 만들지 못했습니다.")}</p>`;
+      }
+    } catch (e) {
+      pending.innerHTML = '<p style="color:var(--red)">서버에 연결하지 못했습니다.</p>';
+    }
+    box.scrollTop = box.scrollHeight;
+  }
+
+  const clear = $("ask-clear");
+  if (clear) clear.addEventListener("click", () => {
+    log.length = 0;
+    saveLog(log);
+    box.querySelectorAll(".bubble").forEach((b) => b.remove());
+  });
+
+  $("ask-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = $("ask-input").value.trim();
+    if (!q) return;
+    $("ask-input").value = "";
+    ask(q);
+  });
+  document.querySelectorAll(".ask-suggest").forEach((b) => b.addEventListener("click", () => ask(b.textContent)));
+
+  // 메인의 질문 예시로 들어온 경우 (?ask=질문) — 한 번만 질문하고 주소에서는 지운다
+  const params = new URLSearchParams(location.search);
+  const auto = params.get("ask");
+  if (auto) {
+    params.delete("ask");
+    history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : ""));
+    ask(auto);
+  }
+})();

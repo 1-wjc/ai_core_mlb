@@ -1,0 +1,58 @@
+{% extends "chat/base.html" %}
+{% block title %}조건 탐색 · MLB 기록 랩{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="kicker">조건 탐색</div>
+  <h1>조건으로 선수 찾기</h1>
+  <p class="lead">조건을 문장으로 입력하면 메타데이터에서 후보를 찾고, 조건을 모두 만족하는 선수만 보여 줍니다. 카드를 누르면 그 선수 페이지에서 질문을 이어 갈 수 있습니다.</p>
+</section>
+
+<form class="pick explore-pick" id="explore-form">
+  <input class="field" id="explore-input" placeholder="예: 통산 홈런 400개 이상인 좌타자" autocomplete="off" required>
+  <button class="btn" type="submit">찾기</button>
+</form>
+<div class="suggest explore-suggest">
+  <button type="button" class="ask-suggest">사이영상을 받은 좌투수</button>
+  <button type="button" class="ask-suggest">통산 세이브 300개 이상</button>
+  <button type="button" class="ask-suggest">ERA+ 140 넘는 선발투수</button>
+  <button type="button" class="ask-suggest">골드글러브를 받은 도미니카 출신 유격수</button>
+</div>
+
+<p class="note" id="explore-status"></p>
+<div class="grid" id="explore-cards"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+  // 조건 탐색 (F2011) — /api/explore 결과를 카드로, 카드는 선수 페이지로 연결
+  (function () {
+    const $ = (id) => document.getElementById(id);
+    const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || "";
+    const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    async function run(condition) {
+      $("explore-status").textContent = "조건에 맞는 선수를 찾는 중입니다…";
+      $("explore-cards").innerHTML = "";
+      try {
+        const res = await fetch("/api/explore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+          body: JSON.stringify({ condition }),
+        });
+        const data = await res.json();
+        if (!res.ok) { $("explore-status").textContent = data.error || "조건 탐색에 실패했습니다."; return; }
+        $("explore-status").textContent = data.cards.length
+          ? `후보 ${data.candidates}명 중 조건에 맞는 ${data.cards.length}명 · ${data.elapsed}초`
+          : `후보 ${data.candidates}명 중 조건에 맞는 선수가 없습니다 · ${data.elapsed}초`;
+        $("explore-cards").innerHTML = data.cards.map((c) =>
+          `<a class="pcard" href="/players/${encodeURIComponent(c.player_id)}/" style="--c: ${c.role === "투수" ? "var(--accent)" : "var(--orange)"}">` +
+          `<span class="pos"><span class="dot"></span>${esc(c.position)}</span><span class="name">${esc(c.name_ko)}</span>` +
+          `<span class="en">${esc(c.name_en)}</span><span class="meta">${c.first_season}–${c.last_season}</span>` +
+          `<span class="reason">${esc(c.reason)}</span></a>`).join("");
+      } catch (e) {
+        $("explore-status").textContent = "서버에 연결하지 못했습니다.";
+      }
+    }
+    $("explore-form").addEventListener("submit", (e) => { e.preventDefault(); const v = $("explore-input").value.trim(); if (v) run(v); });
+    document.querySelectorAll(".explore-suggest button").forEach((b) => b.addEventListener("click", () => { $("explore-input").value = b.textContent; run(b.textContent); }));
+  })();
+</script>
+{% endblock %}

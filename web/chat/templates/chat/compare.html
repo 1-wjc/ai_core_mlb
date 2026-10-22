@@ -1,0 +1,70 @@
+{% extends "chat/base.html" %}
+{% load static %}
+{% block title %}비교 · MLB 기록 랩{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="kicker">선수 비교</div>
+  {% if a and b %}
+  <div class="versus">
+    <div class="side"><h2><a href="{% url 'player' a.player_id %}" style="color:inherit">{{ a.name_ko }}</a></h2><div class="en">{{ a.name_en }} · {{ a.primary_position }}</div></div>
+    <div class="vs">vs</div>
+    <div class="side b"><h2><a href="{% url 'player' b.player_id %}" style="color:inherit">{{ b.name_ko }}</a></h2><div class="en">{{ b.name_en }} · {{ b.primary_position }}</div></div>
+  </div>
+  {% else %}
+  <h1>선수 비교</h1>
+  <p class="lead">두 선수를 선택하면 통산 기록을 나란히 비교하고, 질문에는 근거와 함께 답합니다.</p>
+  {% endif %}
+</section>
+
+<form class="pick" method="get" id="pick-form">
+  <input type="hidden" name="a" id="a-id" value="{{ a_pre.player_id|default:'' }}">
+  <input type="hidden" name="b" id="b-id" value="{{ b.player_id|default:'' }}">
+  <input class="field" list="player-options" id="a-name" placeholder="첫 번째 선수" value="{% if a_pre %}{{ a_pre.name_ko }} ({{ a_pre.name_en }}){% endif %}" required>
+  <input class="field" list="player-options" id="b-name" placeholder="두 번째 선수" value="{% if b %}{{ b.name_ko }} ({{ b.name_en }}){% endif %}" required>
+  <button class="btn" type="submit">비교하기</button>
+</form>
+
+{% if a and b %}
+<div class="layout section">
+  <div>
+    {% if a.role != b.role and not a.two_way and not b.two_way %}
+    <p class="notice">{{ a.name_ko }}은(는) {{ a.role }}, {{ b.name_ko }}은(는) {{ b.role }}라 공통 기록만 비교합니다.</p>
+    {% endif %}
+    {% if pit_rows %}
+    <section class="section">
+      <h2 class="section-title">투구</h2>
+      <div class="card"><div class="table-wrap">
+        <table class="cmp">
+          <thead><tr><th></th><th>{{ a.name_ko }}</th><th>{{ b.name_ko }}</th></tr></thead>
+          <tbody>{% for r in pit_rows %}<tr><th class="l" style="font-weight:500;color:var(--ink3)">{{ r.label }}</th><td class="{% if r.win == 'a' %}win{% endif %}">{{ r.a }}</td><td class="{% if r.win == 'b' %}win{% endif %}">{{ r.b }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div></div>
+    </section>
+    {% endif %}
+    {% if bat_rows %}
+    <section class="section">
+      <h2 class="section-title">타격</h2>
+      <div class="card"><div class="table-wrap">
+        <table class="cmp">
+          <thead><tr><th></th><th>{{ a.name_ko }}</th><th>{{ b.name_ko }}</th></tr></thead>
+          <tbody>{% for r in bat_rows %}<tr><th class="l" style="font-weight:500;color:var(--ink3)">{{ r.label }}</th><td class="{% if r.win == 'a' %}win{% endif %}">{{ r.a }}</td><td class="{% if r.win == 'b' %}win{% endif %}">{{ r.b }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div></div>
+    </section>
+    {% endif %}
+    {% if not pit_rows and not bat_rows %}<p class="empty">두 선수에게 공통으로 비교할 통산 기록이 없습니다.</p>{% endif %}
+    <p class="note">통산 · 1990–2025 시즌 범위 · 초록색은 그 지표에서 더 나은 값 · 지표는 Lahman 기록으로 로컬 계산</p>
+  </div>
+  <aside class="aside">
+    {% with player_id=a.player_id compare_id=b.player_id hint="두 선수의 기록과 위키백과 문서를 검색해 비교하고, 답변에 사용한 근거를 표시합니다." %}
+    {% include "chat/_ask.html" %}
+    {% endwith %}
+  </aside>
+</div>
+{% endif %}
+
+<datalist id="player-options">
+  {% for o in players_json %}<option value="{{ o.name_ko }} ({{ o.name_en }})" data-id="{{ o.player_id }}"></option>{% endfor %}
+</datalist>
+{% endblock %}
+{% block scripts %}<script src="{% static 'chat/ask.js' %}"></script>{% endblock %}
