@@ -30,6 +30,12 @@
     {% if a.role != b.role and not a.two_way and not b.two_way %}
     <p class="notice">{{ a.name_ko }}은(는) {{ a.role }}, {{ b.name_ko }}은(는) {{ b.role }}라 공통 기록만 비교합니다.</p>
     {% endif %}
+    <div class="seg-slider cmp-view" style="--n: 2; --pos: 0" role="tablist" aria-label="기록 구분">
+      <span class="knob"></span>
+      <button type="button" class="on" data-view="raw">원래 기록</button>
+      <button type="button" data-view="rel">리그 대비</button>
+    </div>
+    <div data-cmp="raw">
     {% if pit_rows %}
     <section class="section">
       <h2 class="section-title">투구</h2>
@@ -54,6 +60,21 @@
     {% endif %}
     {% if not pit_rows and not bat_rows %}<p class="empty">두 선수에게 공통으로 비교할 통산 기록이 없습니다.</p>{% endif %}
     <p class="note">통산 · 1901–2025 시즌 범위 · 초록색은 그 지표에서 더 나은 값 · 지표는 Lahman 기록으로 로컬 계산</p>
+    </div>
+    <div data-cmp="rel" hidden>
+    {% for title, rows in rel_tables %}{% if rows %}
+    <section class="section">
+      <h2 class="section-title">{{ title }} · 리그 대비</h2>
+      <div class="card"><div class="table-wrap">
+        <table class="cmp">
+          <thead><tr><th></th><th>{{ a.name_ko }}</th><th>{{ b.name_ko }}</th></tr></thead>
+          <tbody>{% for r in rows %}<tr><th class="l" style="font-weight:500;color:var(--ink3)">{{ r.label }}</th><td class="{% if r.win == 'a' %}win{% endif %}">{{ r.a }}</td><td class="{% if r.win == 'b' %}win{% endif %}">{{ r.b }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div></div>
+    </section>
+    {% endif %}{% endfor %}
+    <p class="note">100 = 그 시즌 리그 평균 · 시즌마다 리그 기준과 비교해 출전량(타석 · 상대 타자 · 이닝)으로 가중 · OPS+ · ERA+ 는 구장 보정 포함 · 시대가 다른 선수 비교용</p>
+    </div>
   </div>
   <aside class="aside">
     {% with player_id=a.player_id compare_id=b.player_id hint="두 선수의 기록과 위키백과 문서를 검색해 비교하고, 답변에 사용한 근거를 표시합니다." %}
@@ -67,4 +88,12 @@
   {% for o in players_json %}<option value="{{ o.name_ko }} ({{ o.name_en }})" data-id="{{ o.player_id }}"></option>{% endfor %}
 </datalist>
 {% endblock %}
-{% block scripts %}<script src="{% static 'chat/ask.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'chat/ask.js' %}?v={{ asset_v }}"></script>
+<script>
+  // [원래 기록 · 리그 대비] 전환 (D1)
+  document.querySelectorAll(".cmp-view button").forEach((b, i, all) => b.addEventListener("click", () => {
+    all.forEach((x) => x.classList.toggle("on", x === b));
+    b.parentElement.style.setProperty("--pos", i);
+    document.querySelectorAll("[data-cmp]").forEach((el) => { el.hidden = el.dataset.cmp !== b.dataset.view; });
+  }));
+</script>{% endblock %}

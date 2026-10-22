@@ -10,9 +10,12 @@
 
 import json
 import os
+import re
+import unicodedata
 import urllib.parse
 
 import lahman_loader as L
+import milestones as MS
 import metrics as M
 import names_ko as K
 from seasons import compute_all
@@ -42,11 +45,72 @@ def wiki_url(lang, title):
     return f"https://{lang}.wikipedia.org/wiki/" + urllib.parse.quote(title.replace(" ", "_"))
 
 
+def search_aliases(link, person, name_ko, name_en):
+    """검색 별칭 — 화면 이름과 표기가 다른 이름 (한국어 문서 제목 · Wikidata 이름표 · Lahman 영문 이름).
+    예: 클레이튼 커쇼 → "클레이턴 커쇼", 타이 코브 → "타이 콥". 영어 이름표는 Lahman 성(last name)이 들어 있을 때만
+    (잘못 편집된 이름표 — Mordecai Brown 의 "Cristiano Ronaldo" — 를 거른다)"""
+    strip = lambda t: re.sub(r"\s*\(.*\)$", "", t or "").strip()
+    fold = lambda t: unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode().lower()
+    last = fold(person.get("nameLast", ""))
+    candidates = [strip(link["ko_title"]), strip(link.get("label_ko")), f"{person.get('nameFirst', '')} {person.get('nameLast', '')}".strip()]
+    if last and last in fold(link.get("label_en") or ""):
+        candidates.append(strip(link["label_en"]))
+    seen = {name_ko.lower(), name_en.lower()}
+    out = []
+    for c in candidates:
+        if c and c.lower() not in seen:
+            seen.add(c.lower())
+            out.append(c)
+    return out
+
+
 def team_name_ko(teams, year, team_id):
     team = teams.get((year, team_id))
     if team is None:
         return team_id
     return K.team_ko(team)
+
+
+# ---- 리그 대비 지수 (D1 시대 보정 비교) — 100 = 그 시즌 리그 평균 ----
+# (키, 분자, 분모) : 시즌마다 "리그 비율 × 선수 분모"를 기대값으로 더해 100 × 실제 합 ÷ 기대 합.
+# 리그 값이 0인 시즌(초기 시즌의 삼진 · 상대 타자 등 빈 열)은 실제 · 기대 양쪽에서 뺀다.
+def _pa(s):
+    return s["AB"] + s["BB"] + s["HBP"] + s["SF"] + s["SH"]
+
+
+BAT_RELATIVE = [
+    ("AVG_idx", lambda s: s["H"], lambda s: s["AB"]),
+    ("OBP_idx", lambda s: s["H"] + s["BB"] + s["HBP"], lambda s: s["AB"] + s["BB"] + s["HBP"] + s["SF"]),
+    ("SLG_idx", lambda s: s["H"] + s["2B"] + 2 * s["3B"] + 3 * s["HR"], lambda s: s["AB"]),
+    ("HR_idx", lambda s: s["HR"], _pa),
+    ("BB_idx", lambda s: s["BB"], _pa),
+    ("K_idx", lambda s: s["SO"], _pa),
+]
+PIT_RELATIVE = [
+    ("K_idx", lambda s: s["SO"], lambda s: s["BFP"]),
+    ("BB_idx", lambda s: s["BB"], lambda s: s["BFP"]),
+    ("HR9_idx", lambda s: s["HR"], lambda s: s["IPouts"]),
+    ("WHIP_idx", lambda s: s["H"] + s["BB"], lambda s: s["IPouts"]),
+]
+
+
+def relative_indexes(seasons, totals, part):
+    """선수 통산 리그 대비 지수 {키: 정수} — part 는 bat | pit"""
+    items = BAT_RELATIVE if part == "bat" else PIT_RELATIVE
+    actual = {k: 0 for k, _, _ in items}
+    expected = {k: 0.0 for k, _, _ in items}
+    for year, season in seasons.items():
+        block = season.get(part)
+        league = (totals.get((year, block["league"])) or {}).get(part) if block else None
+        if not league:
+            continue
+        for key, num, den in items:
+            lg_den = den(league)
+            if not lg_den or not num(league) or not den(block["stats"]):
+                continue
+            expected[key] += num(league) / lg_den * den(block["stats"])
+            actual[key] += num(block["stats"])
+    return {k: round(100 * actual[k] / expected[k]) for k, _, _ in items if expected[k]}
 
 
 def weighted_average(seasons, part, metric, weight_field):
@@ -68,6 +132,7 @@ def weighted_average(seasons, part, metric, weight_field):
 
 def main():
     data = compute_all()
+    reached = MS.compute()                                 # 마일스톤 달성 시즌 (실제 통산 기준)
     teams = data["teams"]
     series = data["series"]
 
@@ -145,12 +210,14 @@ def main():
         is_pitcher_block = pit_sum["IPouts"] > 0 and (role == "투수" or two_way)
         if is_hitter_block:
             bat_m["OPS_plus"] = M.rnd(weighted_average(seasons, "bat", "OPS_plus", "PA"), 0)
-            career["batting"] = {"stats": bat_sum, "metrics": bat_m}
+            career["batting"] = {"stats": bat_sum, "metrics": bat_m,
+                                 "relative": relative_indexes(seasons, data["league_totals"], "bat")}
         if is_pitcher_block:
             pit_m = M.pitching_metrics(pit_sum)
             pit_m["ERA_plus"] = M.rnd(weighted_average(seasons, "pit", "ERA_plus", "IP"), 0)
             pit_m["FIP"] = M.rnd(weighted_average(seasons, "pit", "FIP", "IP"), 2)
-            career["pitching"] = {"stats": pit_sum, "metrics": pit_m}
+            career["pitching"] = {"stats": pit_sum, "metrics": pit_m,
+                                  "relative": relative_indexes(seasons, data["league_totals"], "pit")}
 
         # ---- 최고 시즌 ----
         best_season = None
@@ -255,6 +322,9 @@ def main():
             lines.append(f"올스타 선정 {len(allstar_years)}회 ({', '.join(str(y) for y in allstar_years)})")
         if pid in hall:
             lines.append("명예의 전당 헌액")
+        milestones = reached.get(pid, [])
+        if milestones:
+            lines.append("기록 달성: " + ", ".join(f"{m['label']} ({m['season']})" for m in milestones))
         if post_summary:
             lines.append("포스트시즌: " + ", ".join(post_summary))
         if traits:
@@ -265,6 +335,7 @@ def main():
             "lahman_id": pid,
             "name_ko": link["name_ko"],
             "name_en": link["name_en"] or f"{person['nameFirst']} {person['nameLast']}",
+            "aliases": search_aliases(link, person, link["name_ko"], link["name_en"] or f"{person['nameFirst']} {person['nameLast']}"),
             "birth_year": person["birthYear"],
             "birth_country": country,
             "bats": bats,
@@ -280,6 +351,7 @@ def main():
             "awards_all": [f"{y} {a}" for y, a in award_list],
             "allstar_years": allstar_years,
             "hall_of_fame": pid in hall,
+            "milestones": milestones,
             "career": career,
             "best_season": best_season,
             "postseason_summary": post_summary,

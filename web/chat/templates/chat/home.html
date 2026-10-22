@@ -106,4 +106,4 @@
 
 {% if not q %}{{ timeline|json_script:"timeline-data" }}{% endif %}
 {% endblock %}
-{% block scripts %}<script src="{% static 'chat/home.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'chat/home.js' %}?v={{ asset_v }}"></script>{% endblock %}

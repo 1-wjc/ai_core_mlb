@@ -12,7 +12,7 @@
   function suggest() {
     const q = input.value.normalize("NFC").trim().toLowerCase();
     if (!q || !players.length) { list.hidden = true; return; }
-    const hits = players.filter((p) => p.name_ko.toLowerCase().includes(q) || p.name_en.toLowerCase().includes(q)).slice(0, 8);
+    const hits = players.filter((p) => [p.name_ko, p.name_en, ...(p.aliases || [])].some((n) => n.toLowerCase().includes(q))).slice(0, 8);   // 별칭 포함
     list.innerHTML = hits.map((p) =>
       `<li role="option"><a href="/players/${encodeURIComponent(p.player_id)}/"><strong>${esc(p.name_en)}</strong> ` +
       `<span>${esc(p.name_ko)} · ${esc(p.position)} · ${p.first_season}–${p.last_season}</span></a></li>`).join("") ||
@@ -63,7 +63,10 @@
       <div class="tl-card"><div class="tl-k">홈런 1위</div><div class="tl-v">${leader(d.hr, "개")}</div></div>
       <div class="tl-card"><div class="tl-k">타율 1위 <small>규정 타석</small></div><div class="tl-v">${leader(d.avg, "")}</div></div>
       <div class="tl-card"><div class="tl-k">평균자책점 1위 <small>규정 이닝</small></div><div class="tl-v">${leader(d.era, "")}</div></div>
-      <div class="tl-card"><div class="tl-k">탈삼진 1위</div><div class="tl-v">${leader(d.so, "개")}</div></div>`;
+      <div class="tl-card"><div class="tl-k">탈삼진 1위</div><div class="tl-v">${leader(d.so, "개")}</div></div>` +
+      (d.milestones && d.milestones.length
+        ? `<div class="tl-card wide"><div class="tl-k">기록 달성</div><div class="tl-v">${d.milestones.map((m) => `${link(m)} <small>${esc(m.label)}</small>`).join("<br>")}</div></div>`
+        : "");
   }
   $("tl-range").addEventListener("input", (e) => render(+e.target.value));
   $("tl-prev").addEventListener("click", () => render(Math.max(FIRST, +$("tl-range").value - 1)));

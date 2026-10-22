@@ -36,7 +36,7 @@ TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
     "DIRS": [],
     "APP_DIRS": True,
-    "OPTIONS": {"context_processors": ["django.template.context_processors.request"]},
+    "OPTIONS": {"context_processors": ["django.template.context_processors.request", "chat.context.assets"]},
 }]
 WSGI_APPLICATION = "config.wsgi.application"
 

@@ -57,6 +57,7 @@ def load_candidates():
     with open(path, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             if row["ko_title"] and row["en_title"]:
+                row["label_ko"], row["label_en"] = row["name_ko"], row["name_en"]   # 원래 이름표 (검색 별칭용)
                 # 한국어 이름표가 없으면 한국어 문서 제목. 동명이인 구분용 괄호(예: "호세 페르난데스 (1992년)")는 뺀다
                 row["name_ko"] = re.sub(r"\s*\(.*\)$", "", row["name_ko"] or row["ko_title"])
                 # 영어 이름은 영어 위키 문서 제목 (Wikidata 영어 이름표는 비어 있거나 잘못 편집된 경우가 있음

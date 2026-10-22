@@ -46,4 +46,4 @@
   {% for o in players_json %}<option value="{{ o.name_ko }} ({{ o.name_en }})" data-id="{{ o.player_id }}"></option>{% endfor %}
 </datalist>
 {% endblock %}
-{% block scripts %}<script src="{% static 'chat/lab.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'chat/lab.js' %}?v={{ asset_v }}"></script>{% endblock %}

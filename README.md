@@ -53,7 +53,7 @@ python web/manage.py runserver      # http://127.0.0.1:8000
 |---|---|---|
 | 메인 | `/` | 선수 검색(자동 완성) · 질문 예시(누르면 그 선수 페이지에서 바로 질문) · 시즌 타임라인(1901~2025 연도별 월드시리즈 우승 · MVP · 사이영상 · 부문 1위, MLB 전체 선수 기준) · 전체 선수 목록(투수/타자 · 이름순/최근순 · 구단별) |
 | 선수 | `/players/<id>/` | 프로필 · 통산 기록 [기본 · 세이버 · 상세] · 커리어 그래프 · 시즌별 기록 [정규 · 포스트] × [기본 · 세이버 · 상세 · 수비] · 비슷한 선수 · 질문 패널 [질문 · 사실 확인] (스트리밍 · 근거 원문 미리보기 · 대화 저장) |
-| 비교 | `/compare/?a=&b=` | 두 선수 통산 지표 비교 · 비교 질문 (F2010) |
+| 비교 | `/compare/?a=&b=` | 두 선수 통산 지표 비교 [원래 기록 · 리그 대비(시대 보정)] · 비교 질문 (F2010) |
 | 조건 탐색 | `/explore/` | 자연어 조건 → 조건에 맞는 선수 카드 (F2011) |
 | RAG 실험실 | `/lab/` | 청크 크기 · Top-k · 유사도/MMR · λ를 두 설정으로 나란히 실행해 근거 · 답변 비교 (F2014 확인용) |
 
@@ -62,8 +62,8 @@ python web/manage.py runserver      # http://127.0.0.1:8000
 | API | 요청 | 응답 |
 |---|---|---|
 | `GET /api/status` | | `{mode, notice, key_ready, players, record_docs, index_meta, index_docs}` |
-| `GET /api/players` | | `{players: [{player_id, name_ko, name_en, role, position, first_season, last_season}]}` |
-| `POST /api/ask` | `{player_id, question, compare_id?, history?, mode?}` (`mode`: `ask` · `factcheck`) | `{answer, verdict?, sources: [{n, title, url, source, text?}], cited: [n], steps, collected, mode, elapsed}` (`text`는 인용한 근거만) |
+| `GET /api/players` | | `{players: [{player_id, name_ko, name_en, aliases, role, position, first_season, last_season}]}` |
+| `POST /api/ask` | `{player_id, question, compare_id?, history?, mode?}` (`mode`: `ask` · `factcheck`) | `{answer, verdict?, sources: [{n, title, url, source, text?}], cited: [n], steps, collected, check, mode, elapsed}` (`text`는 인용한 근거만, `check`는 문장별 근거 점검) |
 | `POST /api/ask_stream` | `/api/ask`와 같음 | NDJSON 한 줄씩: `{type: evidence}` → `{type: token}` … → `{type: final}` (오류 시 `{type: error}`) |
 | `POST /api/explore` | `{condition}` | `{cards: [{player_id, name_ko, name_en, role, position, first_season, last_season, reason}], candidates, elapsed}` |
 | `POST /api/lab` | `{player_id, question, configs: [설정 A, 설정 B]}` | 설정별 근거 · 답변 · 소요 시간 |
@@ -95,7 +95,7 @@ python web/manage.py runserver      # http://127.0.0.1:8000
 | F2008 | 주요 주장에 근거 번호 · 실제 인용 근거만 표시 · 제목과 출처 · 인용 0개 안내 | ✅ | 프롬프트 3 규칙 + 답변에서 `[근거 N]` 추출 → 화면 "답변에 사용한 근거 N건"에 제목 · 출처 유형 · 원문 링크. 인용이 없으면 "답변에 인용된 근거가 없습니다" | |
 | F2009 | 목록에서 항목 선택 · 항목별 대화 기록 유지 | ✅ | 선수(비교 시 선수 조합)별 대화를 브라우저(localStorage)에 저장해 새로고침 · 페이지 이동 후에도 유지. 직전 대화(최대 6개 메시지)를 서버로 보내 프롬프트 1 · 3에 넣음 | 확인: 지터 "1996년 신인왕 시즌 타율은?" → "그 다음 해 홈런 수는?" 을 1997년으로 풀어 10개라고 답함 |
 | F2010 | 도메인 특화 기능 1개 이상 · 근거 제시 | ✅ | **① 두 선수 비교** — "비교할 선수"를 고르면 두 선수 범위를 각각 검색(메타데이터 · 기록 · 위키)하고, 비교 규칙을 붙인 프롬프트 3으로 항목별 "A 값 [근거] / B 값 [근거]" 형식으로 답함. 한쪽 근거가 없으면 "확인되지 않음". **② 사실 확인** — 질문 패널을 [사실 확인]으로 바꾸면 주장을 근거와 대조해 첫 줄에 "판정: 참 / 거짓 / 일부 사실 / 근거 부족"을 내고 화면에 판정 배지를 표시. **③ 구단 시절 합산** — 질문에 구단명이 나오면(`rag/team_era.py`) 그 구단에서만 뛴 시즌을 합산해 근거로 넣고, 시즌 중 이적한 해는 따로 표시 | 전체 색인 후 API로 확인: 류현진 vs 커쇼 "2019 시즌 투구 비교" → 승 · ERA · WHIP · 탈삼진 · 이닝 · FIP를 항목별로 양쪽 근거와 함께 비교, 포스트시즌까지 구분 (8.5초). 사실 확인 주장 5개 판정 모두 정답. 푸홀스 "카디널스 시절 홈런" → 구단 합산 근거로 답함 |
-| F2011 | 자연어 조건 입력 · 조건에 맞는 항목만 제시 · 선택 시 대화로 이어짐 | ✅ | `rag/explore.py` — 숫자 조건("홈런 400개 이상")은 규칙으로 읽어 메타데이터 필터, 투타 · 출신 국가 · 수상은 색인 텍스트 포함 필터로 후보를 거른 뒤 의미 유사도로 최대 40명 → 프롬프트 2(조건 선별)가 조건 충족을 판정한 선수만 카드로. 카드를 누르면 그 선수 페이지(질문 패널)로 이동 | 확인: "홈런 400개 이상 좌타자" 9명, "사이영상 좌투수" 12명, "세이브 300개 이상" 12명, 존재하지 않는 조건(일본 출신 사이영상)은 0명. 약 3~25초 |
+| F2011 | 자연어 조건 입력 · 조건에 맞는 항목만 제시 · 선택 시 대화로 이어짐 | ✅ | `rag/explore.py` — 숫자 조건("홈런 400개 이상")은 메타데이터 필터, 투타 · 출신 국가 · 수상은 색인 텍스트 포함 필터. **조건 전체가 이 규칙으로 표현되면 LLM 없이 필터를 통과한 선수 전부**, 규칙 밖 말("선발투수", "파워 히터")이 있으면 의미 유사도 후보 최대 40명 → 프롬프트 2가 판정. 카드 문구는 조건 값("통산 세이브 310개"), 최근 선수부터, 24장씩 더 보기. 카드를 누르면 그 선수 페이지(질문 패널)로 이동 | 확인: "통산 홈런 500개 이상인 우타자" 15명 · "통산 세이브 300개 이상" 17명 · "사이영상을 받은 좌투수" 22명, 모두 데이터와 대조해 빠짐 · 섞임 없음. 규칙 판정 0.2~0.9초 / LLM 판정 3~25초 |
 | F2012 | 진행 상태 표시 · 색인 없음/키 누락 안내 · 위험 도메인 면책 | ✅ | 처리 중 표시, 완료 후 검색어 · 문서 수집 결과(새 검색어 수 · 후보 수 · 선별 문서 제목) · 출처별 근거 수 · 소요 시간. 키가 없거나 색인이 0건이면 안내 후 기록 검색 모드(LLM 미사용)로 대신 답함. 색인 건수는 질문 패널 상단에 항상 표시 | 답변은 스트리밍으로 근거 목록부터 표시. 면책: 야구 기록은 위험 도메인이 아니라 해당 없음 |
 
 ### 3.2 심화 기능 (F2013 ~ F2016)
@@ -123,11 +123,12 @@ python web/manage.py runserver      # http://127.0.0.1:8000
 
 | 항목 | 상태 |
 |---|---|
-| 4장 검증 체크리스트 (통과 · 실패 · 미확인 + 화면 캡처) | 🔲 예정 |
+| 4장 검증 결과 (확인 항목별 실행 결과 · 화면 캡처 · 요구사항 대조표 · 테스트 결과표 · 제출 전 점검) | ✅ [`docs/verification.md`](docs/verification.md) · 캡처 `docs/images/verify/` |
+| 셀프 · 상호 체크리스트 | ⏳ 양식 대기 |
 | 요구사항 정의서 (도메인 조건 충족 근거 · 근거가 필요한 질문 · 기능/비기능 요구사항) | ✅ [`docs/requirements.md`](docs/requirements.md) |
 | RAG 설계문서 (컬렉션 2개 구조 · 프롬프트 3개 · 청크 · Top-k 선택 이유와 변경 시 차이 · 문제와 해결) | ✅ [`docs/rag_design.md`](docs/rag_design.md) |
 | RAG 전후 비교 문서 (F2015) | ✅ `docs/rag_comparison.md` |
-| 소스코드 (수집 · 색인 스크립트 포함) · README | 🟡 진행 중 |
+| 소스코드 (수집 · 색인 스크립트 포함) · README | ✅ |
 
 ## 4. 데이터 준비 및 색인 절차
 
@@ -204,4 +205,8 @@ python web/manage.py runserver      # http://127.0.0.1:8000
 | RAG 실험실 | 청크 · Top-k · 검색 방식 두 설정 나란히 실행 | `rag/lab.py` · `/lab/` |
 | 커리어 그래프 | 시즌별 지표 추이 + 리그 평균(100) 기준선 | `web/chat/static/chat/chart.js` |
 | 비슷한 선수 | 통산 지표 6개 표준화 거리로 5명 | `web/chat/similar.py` |
-| 시즌 타임라인 | 1901~2025 연도별 우승 · 수상 · 부문 1위 | `build/03_build_leaders.py` · `home.js` |
+| 시즌 타임라인 | 1901~2025 연도별 우승 · 수상 · 부문 1위 · 기록 달성자 | `build/03_build_leaders.py` · `home.js` |
+| 시대 보정 비교 | 통산 기록을 리그 평균 대비 지수(100 = 리그 평균)로, 비교 화면 전환 · 비교 질문 근거 | `build/01_build_players.py` `relative_indexes` · `rag/relative.py` |
+| 마일스톤 | 500홈런 · 3,000안타 · 300승 · 3,000탈삼진 · 500세이브 달성 시즌 (이름 아래 칩 · 그래프 표시선 · 타임라인 · 질문 근거) | `build/milestones.py` |
+| 문장별 근거 점검 | 답변 수치가 근거 본문에 있는지 코드로 대조, 근거에 없는 수치 · 근거 번호 없는 문장 표시 | `rag/citecheck.py` · `ask.js` |
+| 검색 별칭 | 한국어 문서 제목 · 원래 이름표 · Lahman 영문 이름으로도 검색 (클레이턴 커쇼 · 타이 콥) | `build/01_build_players.py` `search_aliases` |

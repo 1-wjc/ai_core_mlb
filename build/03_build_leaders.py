@@ -4,13 +4,14 @@
 # 항목(서비스 선수)만이 아니라 Lahman 1901~2025 AL · NL 전체 선수로 계산한다.
 #   홈런 · 탈삼진 1위, 타율 1위(규정 타석 = 팀 경기 × 3.1), 평균자책점 1위(규정 이닝 = 팀 경기 × 1)
 #   팀 경기 수는 그해 Teams 의 최다 경기 수 (154경기 시대 · 파업 · 단축 시즌을 자동 반영)
-#   MVP · 사이영상 (리그별)
+#   MVP · 사이영상 (리그별) · 그해 마일스톤 달성자 (500홈런 · 3,000안타 · 300승 등)
 # 서비스 항목에 있는 선수는 player_id 와 한국어 이름을, 없는 선수는 영어 이름만 남긴다.
 
 import json
 import os
 
 import lahman_loader as L
+import milestones as MS
 
 AWARDS = {"Most Valuable Player": "mvp", "Cy Young Award": "cy"}
 
@@ -34,7 +35,7 @@ def main():
     for (year, _), t in L.load_teams().items():
         team_games[year] = max(team_games.get(year, 0), L.to_int(t["G"]))
 
-    years = {y: {"mvp": [], "cy": [], "hr": None, "avg": None, "era": None, "so": None}
+    years = {y: {"mvp": [], "cy": [], "hr": None, "avg": None, "era": None, "so": None, "milestones": []}
              for y in range(L.FIRST_SEASON, L.LAST_SEASON + 1)}
 
     # 타격: 홈런 1위 · 타율 1위
@@ -79,6 +80,11 @@ def main():
         year = L.to_int(row["yearID"])
         if key and year in years and row["lgID"] in L.LEAGUES:
             years[year][key].append(person(row["playerID"], league=row["lgID"]))
+    # 마일스톤: 그해 기준을 넘은 선수 (실제 통산 기준, build/milestones.py)
+    for pid, items in MS.compute().items():
+        for m in items:
+            if m["season"] in years:
+                years[m["season"]]["milestones"].append({**person(pid), "label": m["label"]})
     for y in years.values():
         for key in ("mvp", "cy"):
             y[key].sort(key=lambda x: x["league"])

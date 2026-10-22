@@ -14,6 +14,7 @@ def compute_all():
       teams      : {(year, teamID): Teams 행}
       series     : SeriesPost 행 목록
       rates      : {(year, lgID): 리그 기준값}
+      league_totals: {(year, lgID): {"bat": 합계, "pit": 합계}} (리그 대비 지수용)
       seasons    : {playerID: {year: {"bat": {...}|None, "pit": {...}|None, "fld": {...}|None, "teams": [...]}}}
       post       : {playerID: {year: {"bat": {...}|None, "pit": {...}|None, "rounds": [...], "teams": [...]}}}
       appearances: {playerID: {포지션 열: 경기 수}}
@@ -31,7 +32,8 @@ def compute_all():
     teams = L.load_teams()
     series = L.load_series()
     rates = {}
-    for key, total in L.league_totals().items():
+    league_totals = L.league_totals()
+    for key, total in league_totals.items():
         rates[key] = M.league_rates(total)
 
     batting = L.sum_by_player_season("Batting.csv", L.BAT_FIELDS, "bat")
@@ -129,6 +131,6 @@ def compute_all():
 
     return {
         "candidates": candidates, "people": people, "lahman_id": lahman_id,
-        "teams": teams, "series": series, "rates": rates,
+        "teams": teams, "series": series, "rates": rates, "league_totals": league_totals,
         "seasons": seasons, "post": post, "appearances": appearances, "roles": roles,
     }

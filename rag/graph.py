@@ -12,8 +12,10 @@ from langgraph.graph import END, START, StateGraph
 
 from rag import config as C
 from rag import prompts as P
+from rag.citecheck import check as check_citations
 from rag.collector import collect_for_question
 from rag.indexer import get_collections, get_embeddings, index_wiki_files
+from rag.relative import relative_evidence, wanted as relative_wanted
 from rag.team_era import era_evidence, find_franchises
 
 VERDICT = re.compile(r"판정\s*[:：]\s*\**\s*(참|거짓|일부 사실|근거 부족)")
@@ -33,6 +35,7 @@ class State(TypedDict, total=False):
     answer: str
     verdict: str           # 사실 확인 판정 (참 · 거짓 · 일부 사실 · 근거 부족)
     cited: list            # 답변에서 실제로 인용한 근거
+    check: dict            # 문장별 근거 점검 결과 (C1)
 
 
 @lru_cache(maxsize=1)
@@ -174,6 +177,11 @@ def retrieve(state: State) -> State:
                                include_pitching=role == "투수" or two_way)
             if era:
                 evidence.append(era)
+        # 시대 보정 (D1) — 비교 질문이거나 "시대 · 리그 대비"를 물으면 리그 대비 통산 지수 근거
+        if relative_wanted(question, len(pids) > 1):
+            rel = relative_evidence(p)
+            if rel:
+                evidence.append(rel)
         wiki_where = {"$and": [{"player_id": p}, {"doc_type": "wiki"}]}
         wiki = search_wiki(docs_col, vectors, wiki_where, wiki_k)
 
@@ -290,7 +298,9 @@ def generate(state: State) -> State:
     if state.get("mode") == "factcheck":
         m = VERDICT.search(answer)
         verdict = m.group(1) if m else "근거 부족"
-    return {"answer": answer, "cited": cited, "verdict": verdict}
+    # 문장별 근거 점검 (C1) — 답변 수치가 근거 본문에 있는지 코드로 대조
+    return {"answer": answer, "cited": cited, "verdict": verdict,
+            "check": check_citations(answer, evidence, state["question"])}
 
 
 def build_graph():

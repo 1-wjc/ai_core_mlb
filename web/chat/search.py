@@ -26,7 +26,7 @@ def load_data():
 def player_list():
     players, _ = load_data()
     rows = [{
-        "player_id": p["player_id"], "name_ko": p["name_ko"], "name_en": p["name_en"],
+        "player_id": p["player_id"], "name_ko": p["name_ko"], "name_en": p["name_en"], "aliases": p.get("aliases", []),
         "role": p["role"], "position": p["primary_position"],
         "first_season": p["first_season"], "last_season": p["last_season"],
     } for p in players.values()]

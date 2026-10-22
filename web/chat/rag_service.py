@@ -61,6 +61,7 @@ def result_of(state):
         "steps": steps_of(state),
         "collected": [t for c in state.get("collection", []) for t in c.get("selected", [])],
         "verdict": state.get("verdict", ""),
+        "check": state.get("check") or {},
     }
 
 
@@ -95,6 +96,7 @@ def ask(player_id, question, compare_id="", history=None, mode="ask"):
         "steps": steps,
         "collected": [t for c in state.get("collection", []) for t in c.get("selected", [])],
         "verdict": state.get("verdict", ""),
+        "check": state.get("check") or {},
     }
 
 

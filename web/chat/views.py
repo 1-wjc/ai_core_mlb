@@ -1,17 +1,17 @@
 # JSON API (화면은 chat/pages.py)
 #   GET  /api/status   → {"mode": "RAG"|"기록 검색", "players", "record_docs", "index_meta", "index_docs", "key_ready", "notice"}
-#   GET  /api/players  → {"players": [{player_id, name_ko, name_en, role, position, first_season, last_season}]}
+#   GET  /api/players  → {"players": [{player_id, name_ko, name_en, aliases(검색 별칭), role, position, first_season, last_season}]}
 #   POST /api/ask      ← {"player_id": "ryuhy01", "question": "...", "compare_id": "kershcl01"(선택, F2010),
 #                         "history": [{"role": "user"|"assistant", "content": "..."}](선택, F2009 직전 대화),
 #                         "mode": "ask"|"factcheck"(선택, 사실 확인 — 입력을 주장으로 보고 판정)}
 #                      → {"answer", "sources": [{n, title, url, source, text(인용 근거만 본문)}], "cited": [n, ...], "steps": [...],
-#                         "collected": [질문 시 새로 수집한 문서 제목], "mode", "elapsed"}
+#                         "collected": [질문 시 새로 수집한 문서 제목], "verdict", "check"(문장별 근거 점검), "mode", "elapsed"}
 #   POST /api/lab      ← {"player_id", "question", "configs": [{chunk, top_k_record, top_k_wiki, search_mode, mmr_lambda} × 2]}
 #                      → {"player_name", "queries", "results": [{config, wiki_chunks_total, wiki_redundancy, evidence, answer, cited, elapsed}], "elapsed"}
 #   POST /api/ask_stream  ← /api/ask 와 같은 요청 → NDJSON 스트림 (evidence → token … → final, B4 답변 스트리밍)
 #   POST /api/explore  ← {"condition": "통산 홈런 400개 이상인 좌타자"}   (F2011 조건 탐색, RAG 모드 전용)
 #                      → {"cards": [{player_id, name_ko, name_en, role, position, first_season, last_season, reason}],
-#                         "candidates": 후보 수, "elapsed"}
+#                         "candidates": 후보 수, "rule": 규칙만으로 판정(LLM 미사용) 여부, "elapsed"}
 #
 # 모드: GMS 키와 색인이 있으면 RAG(rag/graph.py), 없으면 기록 검색(chat/search.py, LLM 미사용)으로 대신 답한다.
 
@@ -99,6 +99,7 @@ def ask(request):
         "steps": result["steps"],
         "collected": result.get("collected", []),
         "verdict": result.get("verdict", ""),
+        "check": result.get("check", {}),          # 문장별 근거 점검 (C1)
         "mode": mode,
         "elapsed": round(time.time() - start, 2),
     })
@@ -120,7 +121,7 @@ def explore(request):
         result = rag_service.explore(condition)
     except Exception:
         return JsonResponse({"error": "조건 탐색에 실패했습니다. 잠시 후 다시 시도하세요."}, status=500)
-    return JsonResponse({"cards": result["cards"], "candidates": result["candidates"],
+    return JsonResponse({"cards": result["cards"], "candidates": result["candidates"], "rule": result.get("rule", False),
                          "elapsed": round(time.time() - start, 2)})
 
 
@@ -185,7 +186,7 @@ def ask_stream(request):
                                 "sources": [{**{k: x[k] for k in ("n", "title", "url", "source")},
                                              **({"text": x.get("text", "")[:1500]} if x["n"] in numbers else {})} for x in payload["sources"]],
                                 "cited": sorted(numbers), "steps": payload["steps"], "collected": payload.get("collected", []),
-                                "verdict": payload.get("verdict", ""), "mode": mode, "elapsed": round(time.time() - start, 2)})
+                                "verdict": payload.get("verdict", ""), "check": payload.get("check", {}), "mode": mode, "elapsed": round(time.time() - start, 2)})
         except Exception:
             # 오류 추적 정보는 보내지 않는다 (NF2004)
             yield line({"type": "error", "error": "답변을 만들지 못했습니다. 잠시 후 다시 시도하세요."})

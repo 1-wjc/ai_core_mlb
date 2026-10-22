@@ -4,7 +4,7 @@
 <section class="hero">
   <div class="kicker">조건 탐색</div>
   <h1>조건으로 선수 찾기</h1>
-  <p class="lead">조건을 문장으로 입력하면 메타데이터에서 후보를 찾고, 조건을 모두 만족하는 선수만 보여 줍니다. 카드를 누르면 그 선수 페이지에서 질문을 이어 갈 수 있습니다.</p>
+  <p class="lead">조건을 문장으로 입력하면 메타데이터에서 후보를 찾고, 조건을 모두 만족하는 선수만 최근 선수부터 보여 줍니다. 카드를 누르면 그 선수 페이지에서 질문을 이어 갈 수 있습니다.</p>
 </section>
 
 <form class="pick explore-pick" id="explore-form">
@@ -20,6 +20,7 @@
 
 <p class="note" id="explore-status"></p>
 <div class="grid" id="explore-cards"></div>
+<div class="pager"><button type="button" class="btn ghost" id="explore-more" hidden>더 보기</button></div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -31,6 +32,7 @@
     async function run(condition) {
       $("explore-status").textContent = "조건에 맞는 선수를 찾는 중입니다…";
       $("explore-cards").innerHTML = "";
+      $("explore-more").hidden = true;
       try {
         const res = await fetch("/api/explore", {
           method: "POST",
@@ -39,18 +41,29 @@
         });
         const data = await res.json();
         if (!res.ok) { $("explore-status").textContent = data.error || "조건 탐색에 실패했습니다."; return; }
+        const how = data.rule ? "규칙 조건으로 판정" : `후보 ${data.candidates}명 중 조건 판정(프롬프트 2)`;
         $("explore-status").textContent = data.cards.length
-          ? `후보 ${data.candidates}명 중 조건에 맞는 ${data.cards.length}명 · ${data.elapsed}초`
-          : `후보 ${data.candidates}명 중 조건에 맞는 선수가 없습니다 · ${data.elapsed}초`;
-        $("explore-cards").innerHTML = data.cards.map((c) =>
-          `<a class="pcard" href="/players/${encodeURIComponent(c.player_id)}/" style="--c: ${c.role === "투수" ? "var(--accent)" : "var(--orange)"}">` +
-          `<span class="pos"><span class="dot"></span>${esc(c.position)}</span><span class="name">${esc(c.name_en)}</span>` +
-          `<span class="en">${esc(c.name_ko)}</span><span class="meta">${c.first_season}–${c.last_season}</span>` +
-          `<span class="reason">${esc(c.reason)}</span></a>`).join("");
+          ? `${how} · 조건에 맞는 ${data.cards.length}명 · 최근 선수부터 · ${data.elapsed}초`
+          : `${how} · 조건에 맞는 선수가 없습니다 · ${data.elapsed}초`;
+        cards = data.cards; shown = 0; more();
       } catch (e) {
         $("explore-status").textContent = "서버에 연결하지 못했습니다.";
       }
     }
+    // 카드는 24장씩 — 남은 카드가 있으면 "더 보기"
+    let cards = [], shown = 0;
+    function more() {
+      const next = cards.slice(shown, shown + 24);
+      shown += next.length;
+      $("explore-cards").insertAdjacentHTML("beforeend", next.map((c) =>
+          `<a class="pcard" href="/players/${encodeURIComponent(c.player_id)}/" style="--c: ${c.role === "투수" ? "var(--accent)" : "var(--orange)"}">` +
+          `<span class="pos"><span class="dot"></span>${esc(c.position)}</span><span class="name">${esc(c.name_en)}</span>` +
+          `<span class="en">${esc(c.name_ko)}</span><span class="meta">${c.first_season}–${c.last_season}</span>` +
+          `<span class="reason">${esc(c.reason)}</span></a>`).join(""));
+      $("explore-more").hidden = shown >= cards.length;
+      $("explore-more").textContent = `더 보기 (${cards.length - shown}명 남음)`;
+    }
+    $("explore-more").addEventListener("click", more);
     $("explore-form").addEventListener("submit", (e) => { e.preventDefault(); const v = $("explore-input").value.trim(); if (v) run(v); });
     document.querySelectorAll(".explore-suggest button").forEach((b) => b.addEventListener("click", () => { $("explore-input").value = b.textContent; run(b.textContent); }));
   })();

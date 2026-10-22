@@ -86,8 +86,54 @@
     return data.verdict ? `<div class="verdict ${VERDICT_CLASS[data.verdict] || "v-unknown"}">판정 · ${escapeHtml(data.verdict)}</div>` : "";
   }
 
+  // 문장별 근거 점검 (C1) — 근거에서 찾지 못한 수치에 주황 밑줄, 근거 번호 없는 문장은 회색 + 요약
+  function checkHtml(data) {
+    const c = data.check;
+    if (!c || !c.sentences) return "";
+    const bits = [c.numbers ? `수치 ${c.numbers}개 중 ${c.found}개 근거에서 확인` : "점검할 수치 없음"];
+    if (c.uncited) bits.push(`근거 번호 없는 문장 ${c.uncited}개`);
+    const warn = (c.missing && c.missing.length) || c.uncited;
+    const items = c.sentences.filter((s) => s.missing.length || s.uncited).map((s) =>
+      `<li>${escapeHtml(s.text.replace(/\[근거[^\]]*\]/g, "").trim())}` +
+      (s.missing.length ? ` — <b>근거에 없는 수치(계산값일 수 있음): ${escapeHtml(s.missing.join(", "))}</b>` : "") +
+      (s.uncited ? " — 근거 번호 없음" : "") + "</li>").join("");
+    return `<div class="cite-check ${warn ? "warn" : "ok"}">${warn ? "⚠" : "✓"} 근거 점검 · ${bits.join(" · ")}` +
+      (items ? `<details><summary>확인할 문장 보기</summary><ul>${items}</ul></details>` : "") + "</div>";
+  }
+
+  function markAnswer(html, data) {
+    const c = data.check;
+    if (!c || !c.sentences) return html;
+    const box = document.createElement("div");
+    box.innerHTML = html;
+    // 근거 번호 없는 문장 → 회색
+    for (const s of c.sentences.filter((x) => x.uncited)) {
+      const plain = s.text.replace(/\*\*/g, "").trim();
+      for (const el of box.querySelectorAll("p, li")) {
+        if (el.textContent.includes(plain)) el.innerHTML = el.innerHTML.replace(escapeHtml(plain), `<span class="uncited" title="근거 번호가 없는 문장">${escapeHtml(plain)}</span>`);
+      }
+    }
+    // 근거에서 찾지 못한 수치 → 주황 밑줄 (글자 노드만 바꿈)
+    const miss = (c.missing || []).map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (miss.length) {
+      const re = new RegExp(`(?<![\\d.,])(${miss.join("|")})(?![\\d])`, "g");
+      const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      for (const n of nodes) {
+        if (!re.test(n.nodeValue)) continue;
+        re.lastIndex = 0;
+        const span = document.createElement("span");
+        span.innerHTML = escapeHtml(n.nodeValue).replace(re, '<mark class="num-miss" title="근거에 없는 수치 — 계산값이거나 근거 밖 내용일 수 있음">$1</mark>');
+        n.replaceWith(...span.childNodes);
+      }
+    }
+    return box.innerHTML;
+  }
+
   function answerHtml(data) {
-    return verdictHtml(data) + `<div class="steps">${escapeHtml(data.steps.join(" · "))} · ${data.elapsed}초</div>${renderMarkdown(data.answer)}${sourcesHtml(data)}`;
+    return verdictHtml(data) + `<div class="steps">${escapeHtml(data.steps.join(" · "))} · ${data.elapsed}초</div>` +
+      markAnswer(renderMarkdown(data.answer), data) + checkHtml(data) + sourcesHtml(data);
   }
 
   // 저장된 대화 다시 그리기

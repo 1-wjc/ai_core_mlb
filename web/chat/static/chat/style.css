@@ -61,6 +61,10 @@ a:hover { text-decoration: underline; }
 .hero h1 .en { display: block; font-size: .50em; letter-spacing: -.01em; color: var(--ink3); font-weight: 500; margin-top: 10px; }
 .lead { font-size: clamp(17px, 1rem + .45vw, 20px); color: var(--ink3); margin: 0; max-width: 42rem; line-height: 1.5; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+/* 이름 아래 플레이 스타일 · 수상 — 이름표 한 줄, 그 아래 칩 */
+.chip-group { margin-top: 18px; }
+.chip-group .chips { margin-top: 8px; }
+.chip-label { font-size: 17px; font-weight: 600; color: var(--ink4); }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-size: 15px; padding: 5px 12px;
   border-radius: 999px; background: var(--card); border: 1px solid var(--line2); color: var(--ink2);
@@ -68,7 +72,7 @@ a:hover { text-decoration: underline; }
 .chip.accent { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: transparent; color: var(--accent); font-weight: 600; }
 .chip.win { background: color-mix(in srgb, var(--green) 14%, transparent); border-color: transparent; color: var(--green); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--accent)); flex: none; }
-
+컴
 /* ---------- 세그먼트 컨트롤 · 버튼 ---------- */
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; }
 .segmented { display: inline-flex; background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 10px; padding: 2px; }
@@ -84,6 +88,7 @@ a:hover { text-decoration: underline; }
   padding: 9px 20px; border-radius: 999px; white-space: nowrap;
 }
 .btn:hover { filter: brightness(1.08); text-decoration: none; }
+[hidden] { display: none !important; }   /* hidden 속성이 .btn 등의 display 에 덮이지 않게 */
 .btn.ghost { background: transparent; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
 .field {
   border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px;
@@ -355,6 +360,9 @@ footer a { color: var(--ink3); }
 .career-chart svg { display: block; width: 100%; overflow: visible; }
 .chart-grid { stroke: var(--line2); stroke-width: 1; }
 .chart-axis { fill: var(--ink4); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-milestone { stroke: var(--green); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-milestone-label { font-size: 11px; font-weight: 600; fill: var(--green); }
+.tip-ms { color: var(--green); font-weight: 600; }
 .chart-ref { stroke: var(--ink4); stroke-width: 1; }
 .chart-ref-label { fill: var(--ink3); font-size: 11px; }
 .chart-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
@@ -367,3 +375,12 @@ footer a { color: var(--ink3); }
 .chart-tip strong { color: var(--ink); }
 .chart-tip span, .chart-tip small { color: var(--ink4); }
 .chart-tip b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---------- 문장별 근거 점검 (C1) ---------- */
+.cite-check { margin-top: 10px; font-size: 12.5px; color: var(--ink3); }
+.cite-check.ok { color: var(--green); }
+.cite-check.warn { color: var(--orange); }
+.cite-check ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink2); }
+.cite-check li { margin-bottom: 4px; }
+.num-miss { background: transparent; color: inherit; text-decoration: underline 2px var(--orange); text-underline-offset: 3px; }
+.uncited { color: var(--ink4); }

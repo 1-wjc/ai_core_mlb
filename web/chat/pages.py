@@ -298,6 +298,7 @@ def timeline():
         conv = lambda x: {"id": x.get("player_id"), "name": x["name"], "value": x.get("value"), "league": x.get("league")}
         years[y] = {"year": y, "ws": None,
                     "mvp": [conv(x) for x in row.get("mvp", [])], "cy": [conv(x) for x in row.get("cy", [])],
+                    "milestones": [{**conv(x), "label": x["label"]} for x in row.get("milestones", [])],
                     **{k: conv(row[k]) if row.get(k) else None for k in ("hr", "avg", "era", "so")}}
     for d in docs.values():
         y = d.get("season")
@@ -311,6 +312,9 @@ def timeline():
 def chart_series(p):
     """커리어 그래프용 정규시즌 값 — 표본이 적은 시즌(50타석 · 10이닝 미만)은 비율 지표를 비운다"""
     abbrs = team_abbrs()
+    reached = {}
+    for m in p.get("milestones", []):                       # 그 시즌에 달성한 마일스톤 (그래프 표시선)
+        reached.setdefault(m["season"], []).append(m["label"])
     rows = []
     for d in sorted((d for d in seasons_by_player().get(p["player_id"], []) if d["doc_type"] == "season_regular"),
                     key=lambda d: d["season"]):
@@ -329,6 +333,7 @@ def chart_series(p):
             "hr": bs.get("HR") if bs else None,
             "era_plus": pm.get("ERA_plus") if outs >= 30 else None, "era": pm.get("ERA") if outs >= 30 else None,
             "so": ps.get("SO") if ps else None,
+            "milestones": reached.get(d["season"], []),
         })
     return rows
 
@@ -365,7 +370,7 @@ def home(request):
     team_name = dict(options).get(team, "")
     if q:
         ql = q.lower()
-        rows = [r for r in rows if ql in r["name_ko"].lower() or ql in r["name_en"].lower()]
+        rows = [r for r in rows if any(ql in n.lower() for n in [r["name_ko"], r["name_en"], *r["aliases"]])]   # 별칭 포함
     if role in ("투수", "타자"):
         rows = [r for r in rows if r["role"] == role]
     if team_name:                                          # 그 구단(현재 프랜차이즈, 옛 이름 시절 포함)에서 한 번이라도 뛴 선수
@@ -431,6 +436,32 @@ def player_detail(request, player_id):
     })
 
 
+# 리그 대비 지수 (D1) — (키, 표기, 좋은 방향, 출처 relative | metrics)
+BAT_REL_ROWS = [("OPS_plus", "OPS+", "high", "metrics"), ("AVG_idx", "타율", "high", "relative"),
+                ("OBP_idx", "출루율", "high", "relative"), ("SLG_idx", "장타율", "high", "relative"),
+                ("HR_idx", "홈런 비율", "high", "relative"), ("BB_idx", "볼넷 비율", "high", "relative"),
+                ("K_idx", "삼진 비율", "low", "relative")]
+PIT_REL_ROWS = [("ERA_plus", "ERA+", "high", "metrics"), ("K_idx", "탈삼진 비율", "high", "relative"),
+                ("BB_idx", "볼넷 비율", "low", "relative"), ("HR9_idx", "9이닝당 피홈런", "low", "relative"),
+                ("WHIP_idx", "WHIP", "low", "relative")]
+
+
+def relative_rows(a, b, rows, kind):
+    """리그 대비 지수 비교 줄 — 100 = 그 시즌 리그 평균"""
+    ba, bb = a["career"].get(kind), b["career"].get(kind)
+    if not ba or not bb:
+        return []
+    out = []
+    for key, label, better, part in rows:
+        va, vb = (ba.get(part) or {}).get(key), (bb.get(part) or {}).get(key)
+        win = ""
+        if isinstance(va, (int, float)) and isinstance(vb, (int, float)) and va != vb:
+            win = "a" if (va > vb) == (better == "high") else "b"
+        out.append({"label": label + (" (낮을수록 좋음)" if better == "low" else ""),
+                    "a": fmt(va, 0), "b": fmt(vb, 0), "win": win})
+    return out
+
+
 def compare_rows(a, b, metric_rows, stat_rows, kind):
     ba, bb = a["career"].get(kind), b["career"].get(kind)
     if not ba or not bb:
@@ -458,6 +489,8 @@ def compare(request):
             "a": a, "b": b,
             "bat_rows": compare_rows(a, b, BAT_ROWS, BAT_STAT_ROWS, "batting"),
             "pit_rows": compare_rows(a, b, PIT_ROWS, PIT_STAT_ROWS, "pitching"),
+            "rel_tables": [("투구", relative_rows(a, b, PIT_REL_ROWS, "pitching")),
+                           ("타격", relative_rows(a, b, BAT_REL_ROWS, "batting"))],
             "suggestions": ["통산 성적 비교", "포스트시즌 비교", "수상 경력 비교"],
         })
     return render(request, "chat/compare.html", context)
