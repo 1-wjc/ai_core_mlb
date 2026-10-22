@@ -1,0 +1,49 @@
+{% extends "chat/base.html" %}
+{% load static %}
+{% block title %}RAG 실험실 · MLB 기록 랩{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="kicker">RAG 실험실</div>
+  <h1>검색 설정 비교</h1>
+  <p class="lead">같은 선수 · 같은 질문을 두 가지 검색 설정으로 실행해 근거와 답변이 어떻게 달라지는지 봅니다. 검색어(프롬프트 1)는 한 번만 만들어 두 설정에 똑같이 씁니다.</p>
+</section>
+
+<form id="lab-form" class="card lab-form">
+  <div class="lab-row">
+    <label class="lab-field">선수
+      <input class="field" list="player-options" id="lab-player" placeholder="선수 이름" value="클레이튼 커쇼 (Clayton Kershaw)" required>
+    </label>
+    <label class="lab-field grow">질문
+      <input class="field" id="lab-q" value="커쇼의 포스트시즌 부진과 2020년 우승" required>
+    </label>
+  </div>
+  <div class="lab-configs">
+    {% for side, chunk, kr, kw, mode, lam in lab_defaults %}
+    <fieldset class="lab-config" data-side="{{ side }}">
+      <legend>설정 {{ side }}</legend>
+      <label>청크 크기 / 겹침
+        <select name="chunk">{% for c in chunk_options %}<option value="{{ c }}" {% if c == chunk %}selected{% endif %}>{{ c }}{% if c == "1000/200" %} (본 색인){% else %} (임시 색인){% endif %}</option>{% endfor %}</select>
+      </label>
+      <label>기록 Top-k <input type="number" name="top_k_record" min="0" max="6" value="{{ kr }}"></label>
+      <label>위키 Top-k <input type="number" name="top_k_wiki" min="1" max="10" value="{{ kw }}"></label>
+      <label>위키 검색
+        <select name="search_mode"><option value="similarity" {% if mode == "similarity" %}selected{% endif %}>유사도 순</option><option value="mmr" {% if mode == "mmr" %}selected{% endif %}>MMR</option></select>
+      </label>
+      <label>MMR λ <input type="number" name="mmr_lambda" min="0" max="1" step="0.1" value="{{ lam }}"></label>
+    </fieldset>
+    {% endfor %}
+  </div>
+  <div class="lab-actions">
+    <button class="btn" type="submit" id="lab-run">두 설정으로 실행</button>
+    <span class="note" style="margin:0">청크 크기를 바꾼 설정은 그 선수의 위키 문서를 처음 한 번 임시로 다시 색인해 시간이 더 걸립니다 (본 색인은 그대로).</span>
+  </div>
+</form>
+
+<p class="note" id="lab-status"></p>
+<div class="lab-results" id="lab-results"></div>
+
+<datalist id="player-options">
+  {% for o in players_json %}<option value="{{ o.name_ko }} ({{ o.name_en }})" data-id="{{ o.player_id }}"></option>{% endfor %}
+</datalist>
+{% endblock %}
+{% block scripts %}<script src="{% static 'chat/lab.js' %}"></script>{% endblock %}

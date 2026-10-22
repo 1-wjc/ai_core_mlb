@@ -1,6 +1,6 @@
 {% extends "chat/base.html" %}
 {% load static %}
-{% block title %}{{ p.name_ko }} · MLB 기록 랩{% endblock %}
+{% block title %}{{ p.name_en }} · MLB 기록 랩{% endblock %}
 {% block content %}
 
 
@@ -9,7 +9,7 @@
     {# 선수 소개 — 왼쪽 열 맨 위. 오른쪽 질문 패널이 이 높이부터 나란히 시작한다 #}
     <section class="hero player-hero">
   <div class="kicker">{{ p.primary_position }}{% if p.two_way %} · 투타겸업{% endif %} · {{ p.first_season }}–{{ p.last_season }}</div>
-  <h1>{{ p.name_ko }}<span class="en">{{ p.name_en }}</span></h1>
+  <h1>{{ p.name_en }}<span class="en">{{ p.name_ko }}</span></h1>
   <p class="lead">{{ p.throws }}{{ p.bats }} · {{ p.birth_year }}년생 · {{ p.birth_country }} · {{ p.teams|join:" / " }}</p>
   <div class="chips">
     {% if p.hall_of_fame %}<span class="chip accent">명예의 전당</span>{% endif %}
@@ -22,7 +22,7 @@
     <div class="tiles">
       {% for k, v in tiles %}<div class="tile"><div class="v">{{ v }}</div><div class="k">{{ k }}</div></div>{% endfor %}
     </div>
-    <p class="note">통산 · 1990–2025 시즌 범위 · 출처 SABR Lahman Database, 지표는 로컬 계산</p>
+    <p class="note">통산 · 1901–2025 시즌 범위 · 출처 SABR Lahman Database, 지표는 로컬 계산</p>
     {% endif %}
 
     {% if p.traits or p.awards %}
@@ -56,8 +56,52 @@
         {% endif %}{% endfor %}
       </div>
       {% endfor %}
-      <p class="note">통산 · 1990–2025 시즌 범위 · 수비 기록은 시즌별로만 있습니다</p>
+      <p class="note">통산 · 1901–2025 시즌 범위 · 수비 기록은 시즌별로만 있습니다</p>
     </section>
+
+    {# 커리어 그래프 (B1) — 값은 아래 시즌별 기록 표에도 있다 #}
+    {% if chart|length > 1 %}
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">커리어 추이</h2>
+      </div>
+      <div class="card career-chart" id="career-chart">
+        <div class="chart-top">
+          <span class="chart-title"></span>
+          <div class="tv-outline chart-metrics" role="tablist" aria-label="그래프 지표">
+            {% for key, label in chart_metrics %}<button type="button" data-metric="{{ key }}" class="{% if forloop.first %}on{% endif %}">{{ label }}</button>{% endfor %}
+          </div>
+        </div>
+        <div class="chart-wrap"><svg role="img" aria-label="시즌별 기록 그래프"></svg><div class="chart-tip" hidden></div></div>
+        <p class="note">정규시즌 · 50타석 · 10이닝 미만 시즌의 비율 지표는 비움 · 같은 값은 아래 시즌별 기록 표에 있습니다</p>
+      </div>
+    </section>
+    {{ chart|json_script:"chart-data" }}
+    {% endif %}
+
+    {% if similar %}
+    <section class="section">
+      <div class="section-head"><h2 class="section-title">비슷한 선수</h2></div>
+      {% for blk in similar %}
+      <div class="card similar">
+        <div class="similar-head">
+          <strong>{{ blk.kind }} 스타일이 비슷한 선수</strong>
+          <span class="note" style="margin:0">{{ p.name_ko }}: {% for k, v in blk.mine %}{{ k }} {{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+        </div>
+        <ol class="similar-list">
+          {% for r in blk.rows %}
+          <li>
+            <span class="sim-score" title="유사도 (100 = 같음)">{{ r.score }}</span>
+            <span class="sim-who"><a href="{% url 'player' r.player_id %}">{{ r.name_en }}</a> <small>{{ r.name_ko }} · {{ r.position }} · {{ r.years }}</small></span>
+            <span class="sim-vals">{% for k, v in r.values %}<span class="{% if k in r.closest %}close{% endif %}">{{ k }} {{ v }}</span>{% endfor %}</span>
+          </li>
+          {% endfor %}
+        </ol>
+        <p class="note">통산 지표 {{ blk.n_feats }}개를 표준화(z-점수)한 거리로 계산 · 비교 대상 {{ blk.pool|floatformat:"0g" }}명 ({% if blk.kind == "타격" %}통산 1,000타석 이상{% elif blk.starters_only %}통산 200이닝 이상 · 선발 비율 0.5 이상{% else %}통산 200이닝 이상{% endif %}) · 파란 글씨는 가장 가까운 지표 2개</p>
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
 
 
   </div>
@@ -89,16 +133,20 @@
     <div class="table-wrap">
       <table class="season-table">
         <thead>
+          {% if t.groups|length > 1 %}{# 투타겸업만: 타격 · 투구 열이 한 표에 있어 구분 줄을 둔다 #}
           <tr class="group-row">
-            <th class="sticky" rowspan="2">시즌</th><th class="l" rowspan="2">구단</th>
-            {% if kind == "post" %}<th class="l" rowspan="2">진출 라운드</th>{% endif %}
+            <th class="sticky"></th><th></th>{% if kind == "post" %}<th></th>{% endif %}
             {% for g, span in t.groups %}<th class="grp" colspan="{{ span }}">{{ g }}</th>{% endfor %}
           </tr>
-          <tr>{% for h in t.headers %}<th>{{ h }}</th>{% endfor %}</tr>
+          {% endif %}
+          <tr>
+            <th class="sticky">시즌</th><th>구단</th>{% if kind == "post" %}<th>진출 라운드</th>{% endif %}
+            {% for h in t.headers %}<th>{{ h }}</th>{% endfor %}
+          </tr>
         </thead>
         <tbody>
           {% for r in t.rows %}
-          <tr><td class="sticky">{{ r.season }}</td><td class="l">{{ r.teams }}</td>{% if kind == "post" %}<td class="l">{{ r.rounds }}</td>{% endif %}{% for c in r.cells %}<td>{{ c }}</td>{% endfor %}</tr>
+          <tr><td class="sticky">{{ r.season }}</td><td>{{ r.teams }}</td>{% if kind == "post" %}<td>{{ r.rounds }}</td>{% endif %}{% for c in r.cells %}<td>{{ c }}</td>{% endfor %}</tr>
           {% endfor %}
         </tbody>
       </table>
@@ -144,4 +192,5 @@
   })();
 </script>
 <script src="{% static 'chat/ask.js' %}"></script>
+<script src="{% static 'chat/chart.js' %}"></script>
 {% endblock %}

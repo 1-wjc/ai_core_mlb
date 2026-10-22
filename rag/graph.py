@@ -14,13 +14,16 @@ from rag import config as C
 from rag import prompts as P
 from rag.collector import collect_for_question
 from rag.indexer import get_collections, get_embeddings, index_wiki_files
+from rag.team_era import era_evidence, find_franchises
 
+VERDICT = re.compile(r"판정\s*[:：]\s*\**\s*(참|거짓|일부 사실|근거 부족)")
 CITE = re.compile(r"\[근거\s*([\d,\s]+)\]")
 
 
 class State(TypedDict, total=False):
     player_id: str
     compare_id: str        # 비교할 선수 (F2010, 없으면 단일 선수 질문)
+    mode: str              # "ask"(기본) | "factcheck"(사실 확인, 입력을 주장으로 보고 판정)
     question: str
     history: list          # 직전 대화 [{role: user|assistant, content}] (F2009)
     player_name: str
@@ -28,6 +31,7 @@ class State(TypedDict, total=False):
     collection: list       # 질문 시 보충 수집 결과 (F2004) — 선수별 요약
     evidence: list         # [{n, source, title, url, text, distance}]
     answer: str
+    verdict: str           # 사실 확인 판정 (참 · 거짓 · 일부 사실 · 근거 부족)
     cited: list            # 답변에서 실제로 인용한 근거
 
 
@@ -125,14 +129,15 @@ def retrieve(state: State) -> State:
     pids = [pid] + ([state["compare_id"]] if state.get("compare_id") and state["compare_id"] != pid else [])
 
     # 1) 선택 선수 메타데이터 — 검색하지 않고 항상 근거에 넣는다
-    names, names_ko, meta_evidence = {}, {}, {}
+    names, names_ko, meta_evidence, roles = {}, {}, {}, {}
     for p in pids:
         got = meta_col.get(ids=[p], include=["documents", "metadatas"])
         if got["ids"]:
             m = got["metadatas"][0]
             names[p] = f"{m['name_ko']} ({m['name_en']})"
             names_ko[p] = m["name_ko"]
-            meta_evidence[p] = {"id": p, "source": "메타데이터", "title": m["title"], "url": m["url"],
+            roles[p] = (m.get("role", "타자"), bool(m.get("two_way")))
+            meta_evidence[p] ={"id": p, "source": "메타데이터", "title": m["title"], "url": m["url"],
                                 "text": got["documents"][0], "distance": None}
     pids = [p for p in pids if p in meta_evidence]
     if not pids:                                   # 색인에 없는 선수 → LLM 을 부르지 않고 끝낸다
@@ -155,12 +160,20 @@ def retrieve(state: State) -> State:
     wiki_k = C.TOP_K_WIKI if len(pids) == 1 else max(1, C.TOP_K_WIKI // 2)
     evidence, collection = [], []
     metrics_found = find_metrics([question] + queries)
+    franchises_found = find_franchises([question] + queries)
     for p in pids:
         evidence.append(meta_evidence[p])
         record_filter = [{"player_id": p}, {"doc_type": {"$ne": "wiki"}}]
         if years:
             record_filter.append({"season": {"$in": years}})
         evidence += search(docs_col, vectors, {"$and": record_filter}, C.TOP_K_RECORD)
+        # 구단 시절 합산 (B3) — 질문에 구단이 나오면 그 구단에서 뛴 시즌을 코드로 합산한 근거
+        role, two_way = roles[p]
+        for fid in franchises_found:
+            era = era_evidence(p, names_ko[p], fid, include_batting=role == "타자" or two_way,
+                               include_pitching=role == "투수" or two_way)
+            if era:
+                evidence.append(era)
         wiki_where = {"$and": [{"player_id": p}, {"doc_type": "wiki"}]}
         wiki = search_wiki(docs_col, vectors, wiki_where, wiki_k)
 
@@ -193,10 +206,11 @@ def search_wiki(collection, vectors, where, k, mode=None):
     return search(collection, vectors, where, k)
 
 
-def search_mmr(collection, vectors, where, k):
+def search_mmr(collection, vectors, where, k, lam=None, fetch_k=None):
     """MMR — 후보를 MMR_FETCH_K 개 넉넉히 가져와, '질문과의 유사도'와 '이미 고른 근거와의 유사도'를
     λ : (1−λ) 로 저울질해 하나씩 고른다. 같은 내용의 청크가 근거에 몰리지 않게 한다."""
-    result = collection.query(query_embeddings=vectors, n_results=C.MMR_FETCH_K, where=where,
+    lam = C.MMR_LAMBDA if lam is None else lam
+    result = collection.query(query_embeddings=vectors, n_results=fetch_k or C.MMR_FETCH_K, where=where,
                               include=["documents", "metadatas", "distances", "embeddings"])
     pool = {}
     for ids, texts, metas, dists, embs in zip(result["ids"], result["documents"], result["metadatas"],
@@ -214,7 +228,7 @@ def search_mmr(collection, vectors, where, k):
     chosen = [int(np.argmax(relevance))]
     while len(chosen) < min(k, len(candidates)):
         redundancy = pairwise[:, chosen].max(axis=1)
-        score = C.MMR_LAMBDA * relevance - (1 - C.MMR_LAMBDA) * redundancy
+        score = lam * relevance - (1 - lam) * redundancy
         score[chosen] = -np.inf
         chosen.append(int(np.argmax(score)))
     picked = []
@@ -262,6 +276,8 @@ def generate(state: State) -> State:
 
     blocks = [f"[근거 {e['n']}] (출처 유형: {e['source']} · {e['title']})\n{e['text']}" for e in evidence]
     system = P.ANSWER_SYSTEM + (P.COMPARE_RULES if state.get("compare_id") else "")
+    if state.get("mode") == "factcheck":
+        system += P.FACTCHECK_RULES
     reply = llm().invoke([
         ("system", system),
         ("user", P.ANSWER_USER.format(player_name=state["player_name"], history=history_text(state.get("history")),
@@ -270,7 +286,11 @@ def generate(state: State) -> State:
     answer = drop_cites_on_unconfirmed(reply.content)
     numbers = {int(n) for group in CITE.findall(answer) for n in group.split(",") if n.strip().isdigit()}
     cited = [e for e in evidence if e["n"] in numbers]
-    return {"answer": answer, "cited": cited}
+    verdict = ""
+    if state.get("mode") == "factcheck":
+        m = VERDICT.search(answer)
+        verdict = m.group(1) if m else "근거 부족"
+    return {"answer": answer, "cited": cited, "verdict": verdict}
 
 
 def build_graph():

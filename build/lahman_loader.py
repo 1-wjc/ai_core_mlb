@@ -2,19 +2,20 @@
 # 01_build_players.py, 02_build_record_docs.py 가 함께 사용한다.
 #
 # 규칙
-#   - 범위: 1990~2025 시즌, 리그 AL · NL 만 (니그로 리그 등 다른 리그 코드 제외)
+#   - 범위: 1901~2025 시즌, 리그 AL · NL 만 (니그로 리그 등 다른 리그 코드 제외). 1901 = 아메리칸리그 창설, 현대 야구 기준
 #   - 한 시즌에 여러 팀(stint)에서 뛴 경우 합산한다.
 #     리그 평균 · 파크 팩터는 출전량(타석 또는 아웃카운트)으로 가중해서 정한다.
 
 import csv
 import os
+import re
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 RAW_DIR = os.path.join(BASE_DIR, "data", "raw")
 LAHMAN_DIR = os.path.join(RAW_DIR, "lahman")
 PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
 
-FIRST_SEASON = 1990
+FIRST_SEASON = 1901
 LAST_SEASON = 2025
 LEAGUES = ("AL", "NL")
 
@@ -31,7 +32,8 @@ def read_csv(path):
 
 
 def to_int(value):
-    """빈 칸은 0으로 본다 (1990년 이후 범위에서는 주요 열이 모두 채워져 있음)."""
+    """빈 칸은 0으로 본다. 초기 시즌은 도루 실패 · 희생플라이 · 고의사구 · 상대 타자 · 수비 이닝 등이 비어 있어 0이 되며,
+    그 값을 쓰는 지표는 분모가 0이면 계산하지 않는다 (metrics.div)."""
     if value is None or value == "":
         return 0
     return int(float(value))
@@ -55,6 +57,11 @@ def load_candidates():
     with open(path, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             if row["ko_title"] and row["en_title"]:
+                # 한국어 이름표가 없으면 한국어 문서 제목. 동명이인 구분용 괄호(예: "호세 페르난데스 (1992년)")는 뺀다
+                row["name_ko"] = re.sub(r"\s*\(.*\)$", "", row["name_ko"] or row["ko_title"])
+                # 영어 이름은 영어 위키 문서 제목 (Wikidata 영어 이름표는 비어 있거나 잘못 편집된 경우가 있음
+                #   — 예: Mordecai Brown 이름표가 "Cristiano Ronaldo". 문서 제목은 MLB에서 쓰는 이름: Shin-Soo Choo · Nick Castellanos)
+                row["name_en"] = re.sub(r"\s*\(.*\)$", "", row["en_title"])
                 candidates[row["key_bbref"]] = row
     return candidates
 
@@ -141,7 +148,7 @@ def league_totals():
 
 # ---------------- 팀 ----------------
 def load_teams():
-    """{(year, teamID): Teams 행} — 1990~2025, AL · NL"""
+    """{(year, teamID): Teams 행} — FIRST_SEASON~LAST_SEASON, AL · NL"""
     teams = {}
     for row in read_csv(os.path.join(LAHMAN_DIR, "Teams.csv")):
         if in_scope(row):
@@ -150,7 +157,7 @@ def load_teams():
 
 
 def load_series():
-    """포스트시즌 시리즈 결과 목록 — 1990~2025"""
+    """포스트시즌 시리즈 결과 목록 — FIRST_SEASON~LAST_SEASON"""
     series = []
     for row in read_csv(os.path.join(LAHMAN_DIR, "SeriesPost.csv")):
         year = int(row["yearID"])

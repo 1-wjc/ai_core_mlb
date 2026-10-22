@@ -44,8 +44,8 @@
           : `후보 ${data.candidates}명 중 조건에 맞는 선수가 없습니다 · ${data.elapsed}초`;
         $("explore-cards").innerHTML = data.cards.map((c) =>
           `<a class="pcard" href="/players/${encodeURIComponent(c.player_id)}/" style="--c: ${c.role === "투수" ? "var(--accent)" : "var(--orange)"}">` +
-          `<span class="pos"><span class="dot"></span>${esc(c.position)}</span><span class="name">${esc(c.name_ko)}</span>` +
-          `<span class="en">${esc(c.name_en)}</span><span class="meta">${c.first_season}–${c.last_season}</span>` +
+          `<span class="pos"><span class="dot"></span>${esc(c.position)}</span><span class="name">${esc(c.name_en)}</span>` +
+          `<span class="en">${esc(c.name_ko)}</span><span class="meta">${c.first_season}–${c.last_season}</span>` +
           `<span class="reason">${esc(c.reason)}</span></a>`).join("");
       } catch (e) {
         $("explore-status").textContent = "서버에 연결하지 못했습니다.";

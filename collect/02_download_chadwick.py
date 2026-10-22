@@ -10,7 +10,7 @@
 #   Lahman People.csv 의 bbrefID  ==  Chadwick 의 key_bbref
 #   Chadwick 의 key_wikidata       →  다음 단계(Wikidata)에서 한국어 이름 · 위키 문서 연결
 #
-# 범위: 1990~2025 시즌에 AL · NL(메이저리그)에서 타격 또는 투구 기록이 있는 선수
+# 범위: 1901~2025 시즌에 AL · NL(메이저리그)에서 타격 또는 투구 기록이 있는 선수 (1901 = 아메리칸리그 창설, 현대 야구 기준)
 #       (니그로 리그 등 다른 리그 코드는 별도 라이선스 문제로 제외)
 
 import csv
@@ -26,7 +26,7 @@ RAW_URL = "https://raw.githubusercontent.com/chadwickbureau/register/master/data
 HEADERS = {"User-Agent": f"AICoreProject/0.1 ({contact()})"}
 FILE_KEYS = "0123456789abcdef"           # people-0.csv ~ people-f.csv
 
-FIRST_SEASON = 1990
+FIRST_SEASON = 1901
 LAST_SEASON = 2025
 LEAGUES = ["AL", "NL"]
 
@@ -81,7 +81,7 @@ for key in FILE_KEYS:
     time.sleep(0.5)
 
 # ---------------- 3. 저장 ----------------
-out_path = os.path.join(SAVE_DIR, "people_mlb_1990_2025.csv")
+out_path = os.path.join(SAVE_DIR, "people_mlb.csv")
 with open(out_path, "w", encoding="utf-8", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=header)
     writer.writeheader()

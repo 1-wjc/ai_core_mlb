@@ -4,6 +4,10 @@
     <span class="mode" id="ask-mode">확인 중</span>
   </div>
   <div class="ask-sub"><span id="ask-count">색인 확인 중</span><button type="button" class="link-btn" id="ask-clear">대화 지우기</button></div>
+  <div class="ask-modes tv-outline" role="tablist" aria-label="질문 방식">
+    <button type="button" class="on" data-mode="ask">질문</button>
+    <button type="button" data-mode="factcheck">사실 확인</button>
+  </div>
   <div class="ask-body" id="ask-messages">
     <p class="ask-hint">{{ hint }}</p>
   </div>

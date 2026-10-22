@@ -6,9 +6,9 @@
   <div class="kicker">선수 비교</div>
   {% if a and b %}
   <div class="versus">
-    <div class="side"><h2><a href="{% url 'player' a.player_id %}" style="color:inherit">{{ a.name_ko }}</a></h2><div class="en">{{ a.name_en }} · {{ a.primary_position }}</div></div>
+    <div class="side"><h2><a href="{% url 'player' a.player_id %}" style="color:inherit">{{ a.name_en }}</a></h2><div class="en">{{ a.name_ko }} · {{ a.primary_position }}</div></div>
     <div class="vs">vs</div>
-    <div class="side b"><h2><a href="{% url 'player' b.player_id %}" style="color:inherit">{{ b.name_ko }}</a></h2><div class="en">{{ b.name_en }} · {{ b.primary_position }}</div></div>
+    <div class="side b"><h2><a href="{% url 'player' b.player_id %}" style="color:inherit">{{ b.name_en }}</a></h2><div class="en">{{ b.name_ko }} · {{ b.primary_position }}</div></div>
   </div>
   {% else %}
   <h1>선수 비교</h1>
@@ -53,7 +53,7 @@
     </section>
     {% endif %}
     {% if not pit_rows and not bat_rows %}<p class="empty">두 선수에게 공통으로 비교할 통산 기록이 없습니다.</p>{% endif %}
-    <p class="note">통산 · 1990–2025 시즌 범위 · 초록색은 그 지표에서 더 나은 값 · 지표는 Lahman 기록으로 로컬 계산</p>
+    <p class="note">통산 · 1901–2025 시즌 범위 · 초록색은 그 지표에서 더 나은 값 · 지표는 Lahman 기록으로 로컬 계산</p>
   </div>
   <aside class="aside">
     {% with player_id=a.player_id compare_id=b.player_id hint="두 선수의 기록과 위키백과 문서를 검색해 비교하고, 답변에 사용한 근거를 표시합니다." %}

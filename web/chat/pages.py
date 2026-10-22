@@ -3,18 +3,22 @@
 #   /players/<id>/           선수 페이지 (프로필 · 통산/시즌별 기록 탭 · 질문 패널)
 #   /compare/?a=&b=          두 선수 비교 (통산 지표 · 질문 패널, F2010)
 #   /explore/                조건 탐색 (F2011)
+#   /lab/                    RAG 실험실 (검색 설정 비교)
 
+import json
 import re
 from functools import lru_cache
 
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 
 from chat import search
+from chat.similar import similar_players
 
 # 지표 표기 · 좋은 방향 (비교 페이지 강조용)
 BAT_ROWS = [("PA", "타석", "high", 0), ("AVG", "타율", "high", 3), ("OBP", "출루율", "high", 3), ("SLG", "장타율", "high", 3),
@@ -265,7 +269,7 @@ def highlight_tiles(p):
 # ---------------- 메인: 질문 예시 · 시즌 타임라인 ----------------
 # 질문 예시 (누르면 선수 페이지에서 바로 질문) — (선수 ID, 표시 이름, 질문, 비교 선수 ID)
 EXAMPLES = [
-    ("ohtansh01", "오타니 쇼헤이", "2023년 부상 이야기 해줘", ""),
+    ("ohtansh01", "오타니 쇼헤이", "2023 시즌 투타 성적은?", ""),
     ("ryuhy01", "류현진", "2019 시즌은 어땠어?", ""),
     ("kershcl01", "클레이튼 커쇼", "2020 월드시리즈 우승 때 활약은?", ""),
     ("ryuhy01", "류현진 vs 클레이튼 커쇼", "2019 시즌 투구 비교", "kershcl01"),
@@ -281,54 +285,61 @@ WS_RESULT = re.compile(r"월드시리즈 승리 \((\d+)승 (\d+)패, 상대 ([^)
 
 @lru_cache(maxsize=1)
 def timeline():
-    """연도별 { year, ws, mvp, cy, hr, avg, era, so } — 개인 1위 · 수상은 이 서비스 선수(1,466명) 기준"""
-    players, docs = search.load_data()
-    years = {y: {"year": y, "ws": None, "mvp": [], "cy": [], "hr": None, "avg": None, "era": None, "so": None}
-             for y in range(1990, 2026)}
-
-    def person(pid, value=None):
-        p = players[pid]
-        return {"id": pid, "name": p["name_ko"], "value": value}
-
-    for pid, p in players.items():
-        for award in p["awards"]:
-            year, name = award.split(" ", 1)
-            year = int(year)
-            if year in years and name == "MVP":
-                years[year]["mvp"].append(person(pid))
-            if year in years and name == "사이영상":
-                years[year]["cy"].append(person(pid))
-
+    """연도별 { year, ws, mvp, cy, hr, avg, era, so }
+    - 월드시리즈: 팀 시즌 기록 문서
+    - 수상 · 부문 1위: data/processed/season_leaders.json (build/03 — Lahman AL · NL 전체 선수 기준, 리그 구분)
+      서비스 선수는 id 가 있어 선수 페이지로 연결, 아닌 선수는 이름만"""
+    _, docs = search.load_data()
+    with open(settings.SEASON_LEADERS_PATH, encoding="utf-8") as f:
+        leaders = json.load(f)
+    years = {}
+    for y in sorted(int(k) for k in leaders):
+        row = leaders.get(str(y), {})
+        conv = lambda x: {"id": x.get("player_id"), "name": x["name"], "value": x.get("value"), "league": x.get("league")}
+        years[y] = {"year": y, "ws": None,
+                    "mvp": [conv(x) for x in row.get("mvp", [])], "cy": [conv(x) for x in row.get("cy", [])],
+                    **{k: conv(row[k]) if row.get(k) else None for k in ("hr", "avg", "era", "so")}}
     for d in docs.values():
         y = d.get("season")
-        if y not in years:
-            continue
-        if d["doc_type"] == "team_season" and "월드시리즈 우승" in d["text"]:
+        if y in years and d["doc_type"] == "team_season" and "월드시리즈 우승" in d["text"]:
             m = WS_RESULT.search(d["text"])
             years[y]["ws"] = {"team": d["title"].split(f" {y}")[0], "abbr": d.get("team_abbr", ""),
                               "result": f"{m.group(1)}승 {m.group(2)}패" if m else "", "opponent": m.group(3) if m else ""}
-        if d["doc_type"] != "season_regular":
-            continue
-        games = TEAM_GAMES.get(y, 162)
-        bat_s, bat_m = d["stats"].get("batting"), d["metrics"].get("batting")
-        pit_s, pit_m = d["stats"].get("pitching"), d["metrics"].get("pitching")
-        row = years[y]
-        if bat_s:
-            if not row["hr"] or bat_s["HR"] > row["hr"]["value"]:
-                row["hr"] = person(d["player_id"], bat_s["HR"])
-            if bat_m["PA"] >= 3.1 * games and bat_m["AVG"] is not None and (not row["avg"] or bat_m["AVG"] > row["avg"]["value"]):
-                row["avg"] = person(d["player_id"], bat_m["AVG"])
-        if pit_s:
-            if not row["so"] or pit_s["SO"] > row["so"]["value"]:
-                row["so"] = person(d["player_id"], pit_s["SO"])
-            if pit_s["IPouts"] >= 3 * games and pit_m["ERA"] is not None and (not row["era"] or pit_m["ERA"] < row["era"]["value"]):
-                row["era"] = person(d["player_id"], pit_m["ERA"])
-    for row in years.values():
-        if row["avg"]:
-            row["avg"]["value"] = fmt(row["avg"]["value"], 3)
-        if row["era"]:
-            row["era"]["value"] = fmt(row["era"]["value"], 2)
     return [years[y] for y in sorted(years)]
+
+
+def chart_series(p):
+    """커리어 그래프용 정규시즌 값 — 표본이 적은 시즌(50타석 · 10이닝 미만)은 비율 지표를 비운다"""
+    abbrs = team_abbrs()
+    rows = []
+    for d in sorted((d for d in seasons_by_player().get(p["player_id"], []) if d["doc_type"] == "season_regular"),
+                    key=lambda d: d["season"]):
+        bs, bm = d["stats"].get("batting") or {}, d["metrics"].get("batting") or {}
+        ps, pm = d["stats"].get("pitching") or {}, d["metrics"].get("pitching") or {}
+        pa, outs = bm.get("PA", 0), ps.get("IPouts", 0)
+        volume = []
+        if pa:
+            volume.append(f"{pa}타석")
+        if outs:
+            volume.append(f"{pm.get('IP')}이닝")
+        rows.append({
+            "season": d["season"], "teams": "/".join(abbrs.get((t, d["season"]), t) for t in d.get("teams", [])),
+            "pa_text": f"{pa}타석" if pa else "", "ip_text": f"{pm.get('IP')}이닝" if outs else "",
+            "ops_plus": bm.get("OPS_plus") if pa >= 50 else None, "avg": bm.get("AVG") if pa >= 50 else None,
+            "hr": bs.get("HR") if bs else None,
+            "era_plus": pm.get("ERA_plus") if outs >= 30 else None, "era": pm.get("ERA") if outs >= 30 else None,
+            "so": ps.get("SO") if ps else None,
+        })
+    return rows
+
+
+def chart_metrics(p):
+    """역할에 맞는 지표 버튼 [(키, 표기)] — 주 역할을 앞에"""
+    bat = [("ops_plus", "OPS+"), ("hr", "홈런"), ("avg", "타율")]
+    pit = [("era_plus", "ERA+"), ("so", "탈삼진"), ("era", "평균자책점")]
+    if p["two_way"]:
+        return pit + bat if p["role"] == "투수" else bat + pit
+    return pit if p["role"] == "투수" else bat
 
 
 # ---------------- 페이지 ----------------
@@ -357,8 +368,8 @@ def home(request):
         rows = [r for r in rows if ql in r["name_ko"].lower() or ql in r["name_en"].lower()]
     if role in ("투수", "타자"):
         rows = [r for r in rows if r["role"] == role]
-    if team_name:                                          # 그 구단에서 한 번이라도 뛴 선수
-        rows = [r for r in rows if team_name in players[r["player_id"]]["teams"]]
+    if team_name:                                          # 그 구단(현재 프랜차이즈, 옛 이름 시절 포함)에서 한 번이라도 뛴 선수
+        rows = [r for r in rows if team_name in players[r["player_id"]].get("franchises", players[r["player_id"]]["teams"])]
     if sort == "recent":                                   # 최근: 활약 마지막 시즌이 늦은 순 (같으면 이름순)
         rows.sort(key=lambda r: (-r["last_season"], r["name_ko"]))
     else:                                                  # 이름순: 한국어 이름
@@ -391,6 +402,7 @@ def home(request):
         "next_link": link(page=page.next_page_number()) if page.has_next() else "",
         "examples": [{"id": e[0], "name": e[1], "q": e[2], "compare": e[3]} for e in EXAMPLES if e[0] in players],
         "timeline": timeline(),
+        "tl_first": timeline()[0]["year"], "tl_last": timeline()[-1]["year"],
     })
 
 
@@ -403,6 +415,9 @@ def player_detail(request, player_id):
         "bat_rows": career_rows(p, BAT_ROWS, BAT_STAT_ROWS, "batting"),
         "pit_rows": career_rows(p, PIT_ROWS, PIT_STAT_ROWS, "pitching"),
         "career": career_tables(p),
+        "similar": similar_players(p["player_id"]),
+        "chart": chart_series(p),
+        "chart_metrics": chart_metrics(p),
         "career_tabs": TABS,
         "season_tabs": TABS + [("fielding", "수비")],
         "season_tables": [(kind, tab, season_table(p, kind == "post", tab))
@@ -412,7 +427,7 @@ def player_detail(request, player_id):
         "post_count": sum(1 for s in season_rows(p) if s["post"]),
         "players_json": search.player_list(),
         "suggestions": [f"{p['best_season']} 시즌 성적은?" if p.get("best_season") else "최고 시즌은?",
-                        "플레이 스타일은?", "부상 이력은?", "포스트시즌 성적은?"],
+                        "플레이 스타일은?", "수상 경력은?", "포스트시즌 성적은?"],
     })
 
 
@@ -452,3 +467,13 @@ def compare(request):
 def explore_page(request):
     """조건 탐색 (F2011) — 화면만, 탐색은 /api/explore"""
     return render(request, "chat/explore.html")
+
+
+@ensure_csrf_cookie
+def lab_page(request):
+    """RAG 실험실 — 검색 설정 2가지 비교 화면 (실행은 /api/lab)"""
+    return render(request, "chat/lab.html", {
+        "players_json": search.player_list(),
+        "chunk_options": ["1000/200", "500/100", "2000/300"],
+        "lab_defaults": [("A", "1000/200", 3, 4, "similarity", 0.7), ("B", "1000/200", 3, 4, "mmr", 0.7)],
+    })

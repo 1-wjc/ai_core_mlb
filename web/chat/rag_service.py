@@ -42,9 +42,7 @@ def collection_steps(collection):
     return steps
 
 
-def ask(player_id, question, compare_id="", history=None):
-    state = graph().invoke({"player_id": player_id, "compare_id": compare_id, "question": question,
-                            "history": history or []})
+def steps_of(state):
     evidence = state.get("evidence", [])
     kinds = {}
     for e in evidence:
@@ -52,11 +50,51 @@ def ask(player_id, question, compare_id="", history=None):
     steps = ["검색어: " + ", ".join(state.get("queries", [])[:-1] or ["(원 질문만)"])]
     steps += collection_steps(state.get("collection", []))
     steps.append("근거 " + " · ".join(f"{k} {v}" for k, v in kinds.items()))
+    return steps
+
+
+def result_of(state):
+    evidence = state.get("evidence", [])
     return {
         "answer": state.get("answer", ""),
-        "sources": [{"n": e["n"], "title": e["title"], "url": e["url"], "source": e["source"]} for e in evidence],
+        "sources": [{"n": e["n"], "title": e["title"], "url": e["url"], "source": e["source"], "text": e["text"]} for e in evidence],
+        "steps": steps_of(state),
+        "collected": [t for c in state.get("collection", []) for t in c.get("selected", [])],
+        "verdict": state.get("verdict", ""),
+    }
+
+
+def stream(player_id, question, compare_id="", history=None, mode="ask"):
+    """답변 스트리밍 (B4) — LangGraph stream 으로 retrieve 결과(근거 · 진행 상태)를 먼저, generate 노드의 글자를 생성되는 대로 낸다.
+    ("evidence", {steps, sources}) → ("token", "글자") … → ("final", 결과)"""
+    state = {}
+    inputs = {"player_id": player_id, "compare_id": compare_id, "question": question, "history": history or [], "mode": mode}
+    for kind, chunk in graph().stream(inputs, stream_mode=["updates", "messages"]):
+        if kind == "updates":
+            for node, update in chunk.items():
+                state.update(update or {})
+                if node == "retrieve":
+                    yield "evidence", {"steps": steps_of(state),
+                                       "sources": [{"n": e["n"], "title": e["title"], "url": e["url"], "source": e["source"]}
+                                                   for e in state.get("evidence", [])]}
+        elif kind == "messages":
+            message, meta = chunk
+            if meta.get("langgraph_node") == "generate" and getattr(message, "content", ""):
+                yield "token", message.content
+    yield "final", result_of(state)
+
+
+def ask(player_id, question, compare_id="", history=None, mode="ask"):
+    state = graph().invoke({"player_id": player_id, "compare_id": compare_id, "question": question,
+                            "history": history or [], "mode": mode})
+    steps = steps_of(state)
+    evidence = state.get("evidence", [])
+    return {
+        "answer": state.get("answer", ""),
+        "sources": [{"n": e["n"], "title": e["title"], "url": e["url"], "source": e["source"], "text": e["text"]} for e in evidence],
         "steps": steps,
         "collected": [t for c in state.get("collection", []) for t in c.get("selected", [])],
+        "verdict": state.get("verdict", ""),
     }
 
 

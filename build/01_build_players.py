@@ -6,7 +6,7 @@
 #
 # index_text: 선수 1명을 검색용 텍스트 1개로 만든 것 (영화 팩의 줄거리 역할).
 #             숫자 · 이름은 원본에서, 문장은 정해진 틀로 만든다 (LLM 미사용).
-# 통산은 "1990~2025 범위 안" 통산이다 (그 이전 시즌은 포함하지 않음).
+# 통산은 "1901~2025 범위 안" 통산이다 (1900년 이전 시즌은 포함하지 않음).
 
 import json
 import os
@@ -46,7 +46,7 @@ def team_name_ko(teams, year, team_id):
     team = teams.get((year, team_id))
     if team is None:
         return team_id
-    return K.FRANCHISE_KO.get(team["franchID"], team["name"])
+    return K.team_ko(team)
 
 
 def weighted_average(seasons, part, metric, weight_field):
@@ -116,13 +116,17 @@ def main():
                     gs_sum += season["pit"]["stats"]["GS"]
             primary_position = "선발투수" if gs_sum >= g_sum / 2 else "구원투수"
 
-        # ---- 소속 팀 (처음 뛴 순서) ----
-        team_names = []
+        # ---- 소속 팀 (처음 뛴 순서) — 그 시대 구단 이름 · 구단 필터용 현재 프랜차이즈 이름 ----
+        team_names, franchises = [], []
         for year in years:
             for team_id in seasons[year]["teams"]:
                 name = team_name_ko(teams, year, team_id)
                 if name not in team_names:
                     team_names.append(name)
+                team = teams.get((year, team_id))
+                franchise = K.FRANCHISE_KO.get(team["franchID"], name) if team else name
+                if franchise not in franchises:
+                    franchises.append(franchise)
 
         # ---- 통산 (범위 안) ----
         bat_sum = {f: 0 for f in L.BAT_FIELDS}
@@ -219,13 +223,13 @@ def main():
         if "batting" in career:
             m = career["batting"]["metrics"]
             career_lines.append(
-                f"통산 타격(1990~2025 범위): 타율 {fmt3(m['AVG'])} · 출루율 {fmt3(m['OBP'])} · "
+                f"통산 타격({L.FIRST_SEASON}~{L.LAST_SEASON} 범위): 타율 {fmt3(m['AVG'])} · 출루율 {fmt3(m['OBP'])} · "
                 f"장타율 {fmt3(m['SLG'])} · OPS {fmt3(m['OPS'])} · OPS+ {fmt(m['OPS_plus'], 0)} · "
                 f"홈런 {bat_sum['HR']} · 타점 {bat_sum['RBI']} · 도루 {bat_sum['SB']}")
         if "pitching" in career:
             m = career["pitching"]["metrics"]
             pitching_line = (
-                f"통산 투구(1990~2025 범위): {pit_sum['W']}승 {pit_sum['L']}패 {pit_sum['SV']}세이브 · "
+                f"통산 투구({L.FIRST_SEASON}~{L.LAST_SEASON} 범위): {pit_sum['W']}승 {pit_sum['L']}패 {pit_sum['SV']}세이브 · "
                 f"{m['IP']}이닝 · 평균자책점 {fmt(m['ERA'])} · ERA+ {fmt(m['ERA_plus'], 0)} · "
                 f"FIP {fmt(m['FIP'])} · WHIP {fmt(m['WHIP'])} · 탈삼진 {pit_sum['SO']}")
             if role == "투수":
@@ -271,6 +275,7 @@ def main():
             "first_season": years[0],
             "last_season": years[-1],
             "teams": team_names,
+            "franchises": franchises,
             "awards": major_awards,
             "awards_all": [f"{y} {a}" for y, a in award_list],
             "allstar_years": allstar_years,

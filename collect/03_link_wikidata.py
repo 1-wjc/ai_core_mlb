@@ -3,7 +3,7 @@
 #
 # 출처   : Wikidata Query Service (https://query.wikidata.org/) — CC0
 #          한국어 위키백과 API (문서 길이 확인용) — CC BY-SA
-# 입력   : data/raw/chadwick/people_mlb_1990_2025.csv  (key_wikidata 열)
+# 입력   : data/raw/chadwick/people_mlb.csv  (key_wikidata 열)
 # 저장   : data/raw/wikidata/players_wikidata.csv
 #
 # Chadwick에 이미 Wikidata ID(Q번호)가 있으므로 이름 검색 없이 ID로 정확히 연결한다.
@@ -26,7 +26,7 @@ BATCH = 200          # SPARQL 한 번에 조회할 ID 수
 MIN_KO_BYTES = 3000  # 한국어 문서 "약 1,000자 이상" 기준 (한글 1자 ≈ 3바이트)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CHADWICK_PATH = os.path.join(BASE_DIR, "..", "data", "raw", "chadwick", "people_mlb_1990_2025.csv")
+CHADWICK_PATH = os.path.join(BASE_DIR, "..", "data", "raw", "chadwick", "people_mlb.csv")
 SAVE_DIR = os.path.join(BASE_DIR, "..", "data", "raw", "wikidata")
 
 

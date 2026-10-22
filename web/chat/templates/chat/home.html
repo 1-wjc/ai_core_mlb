@@ -4,7 +4,7 @@
 {% block content %}
 {# ---------- 선수 검색 (메인) ---------- #}
 <section class="hero home-hero">
-  <div class="kicker">MLB 1990–2025 시즌 · 선수 {{ player_total|floatformat:"0g" }}명</div>
+  <div class="kicker">MLB 1901–2025 시즌 · 선수 {{ player_total|floatformat:"0g" }}명</div>
   <h1>선수 검색</h1>
   <p class="lead">선수를 찾아 기록을 보고, 기록 데이터와 위키백과 문서를 근거로 질문할 수 있습니다.</p>
   <form class="home-search" id="home-search" method="get" action="{% url 'home' %}" role="search" autocomplete="off">
@@ -14,6 +14,7 @@
   </form>
 </section>
 
+{% if not q %}{# 검색 중에는 질문 예시 · 타임라인 · 필터를 숨기고 결과 카드만 #}
 {# ---------- 질문 예시 (3번) ---------- #}
 <section class="section">
   <h2 class="section-title">이렇게 물어보세요</h2>
@@ -34,13 +35,13 @@
 <section class="section">
   <div class="section-head">
     <h2 class="section-title">시즌 타임라인</h2>
-    <span class="note" style="margin:0">수상 · 개인 1위는 이 서비스 선수 {{ player_total|floatformat:"0g" }}명 기준</span>
+    <span class="note" style="margin:0">MLB(AL · NL) 전체 선수 기준 · 링크는 이 서비스에 있는 선수</span>
   </div>
   <div class="card timeline">
     <div class="tl-controls">
       <button type="button" class="tl-step" id="tl-prev" aria-label="이전 해">‹</button>
       <div class="tl-track" id="tl-track">
-        <input type="range" id="tl-range" min="1990" max="2025" value="2025" aria-label="연도 선택">
+        <input type="range" id="tl-range" min="{{ tl_first }}" max="{{ tl_last }}" value="{{ tl_last }}" aria-label="연도 선택">
         <span class="tl-thumb" id="tl-year" aria-hidden="true">2025</span>
       </div>
       <button type="button" class="tl-step" id="tl-next" aria-label="다음 해">›</button>
@@ -48,6 +49,7 @@
     <div class="tl-grid" id="tl-grid"></div>
   </div>
 </section>
+{% endif %}
 
 {# ---------- 전체 선수 ---------- #}
 <section class="section" id="players">
@@ -58,6 +60,7 @@
     </h2>
     {% if q %}<a class="note" style="margin:0" href="{{ clear_q }}">검색 지우기</a>{% endif %}
   </div>
+  {% if not q %}
   <div class="toolbar">
     <div class="toolbar-group">
       <div class="seg-slider" style="--n: 3; --pos: {{ role_pos }}" role="tablist" aria-label="역할">
@@ -79,13 +82,14 @@
       {% for label, href, on in sort_tabs %}<a href="{{ href }}" class="{% if on %}on{% endif %}">{{ label }}</a>{% endfor %}
     </div>
   </div>
+  {% endif %}
   {% if page.object_list %}
   <div class="grid">
     {% for r in page.object_list %}
     <a class="pcard" href="{% url 'player' r.player_id %}" style="--c: {% if r.role == '투수' %}var(--accent){% else %}var(--orange){% endif %}">
       <span class="pos"><span class="dot"></span>{{ r.position }}</span>
-      <span class="name">{{ r.name_ko }}</span>
-      <span class="en">{{ r.name_en }}</span>
+      <span class="name">{{ r.name_en }}</span>
+      <span class="en">{{ r.name_ko }}</span>
       <span class="meta">{{ r.first_season }}–{{ r.last_season }} · {{ r.teams }}{% if r.awards %} · 수상 {{ r.awards }}{% endif %}</span>
     </a>
     {% endfor %}
@@ -100,6 +104,6 @@
   {% endif %}
 </section>
 
-{{ timeline|json_script:"timeline-data" }}
+{% if not q %}{{ timeline|json_script:"timeline-data" }}{% endif %}
 {% endblock %}
 {% block scripts %}<script src="{% static 'chat/home.js' %}"></script>{% endblock %}

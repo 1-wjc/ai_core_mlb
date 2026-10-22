@@ -15,6 +15,7 @@
         <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name != 'compare' %}on{% endif %}">선수</a>
         <a href="{% url 'compare' %}" class="{% if request.resolver_match.url_name == 'compare' %}on{% endif %}">비교</a>
         <a href="{% url 'explore_page' %}" class="{% if request.resolver_match.url_name == 'explore_page' %}on{% endif %}">조건 탐색</a>
+        <a href="{% url 'lab' %}" class="{% if request.resolver_match.url_name == 'lab' %}on{% endif %}">RAG 실험실</a>
       </nav>
       <form class="top-search" method="get" action="{% url 'home' %}" role="search">
         <input type="search" name="q" placeholder="선수 검색" aria-label="선수 검색">

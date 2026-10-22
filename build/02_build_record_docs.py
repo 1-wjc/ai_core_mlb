@@ -46,7 +46,7 @@ def team_label(teams, year, team_id):
     team = teams.get((year, team_id))
     if team is None:
         return team_id
-    return K.FRANCHISE_KO.get(team["franchID"], team["name"])
+    return K.team_ko(team)
 
 
 def batting_line(stats, m):

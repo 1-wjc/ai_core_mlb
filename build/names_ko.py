@@ -1,7 +1,7 @@
 # 한국어 표기표 (구단 · 포스트시즌 라운드 · 수상 · 포지션 · 투타)
-# 원본 코드 값은 Lahman 데이터 기준 (1990~2025, AL · NL)
+# 원본 코드 값은 Lahman 데이터 기준 (1901~2025, AL · NL)
 
-# 구단: Lahman franchID → 현재 구단 한국어 이름
+# 구단: Lahman franchID → 현재 구단 한국어 이름 (구단 필터 · 구단 시절 합산의 묶음 이름)
 FRANCHISE_KO = {
     "ARI": "애리조나 다이아몬드백스", "ATL": "애틀랜타 브레이브스", "BAL": "볼티모어 오리올스",
     "BOS": "보스턴 레드삭스", "CHC": "시카고 컵스", "CHW": "시카고 화이트삭스",
@@ -14,6 +14,34 @@ FRANCHISE_KO = {
     "SFG": "샌프란시스코 자이언츠", "STL": "세인트루이스 카디널스", "TBD": "탬파베이 레이스",
     "TEX": "텍사스 레인저스", "TOR": "토론토 블루제이스", "WSN": "워싱턴 내셔널스",
 }
+
+# 구단: 그해 Lahman 구단 이름(Teams.name) → 한국어. 이전 · 개명 전 이름은 그 시대 이름으로 표기한다
+#   (예: 1935 보스턴 브레이브스 · 1955 브루클린 다저스 · 2004 몬트리올 엑스포스). 없으면 FRANCHISE_KO
+TEAM_NAME_KO = {
+    "Los Angeles Angels": "로스앤젤레스 에인절스", "California Angels": "캘리포니아 에인절스",
+    "Anaheim Angels": "애너하임 에인절스", "Los Angeles Angels of Anaheim": "로스앤젤레스 에인절스",
+    "Boston Beaneaters": "보스턴 비너터스", "Boston Doves": "보스턴 도브스", "Boston Rustlers": "보스턴 러슬러스",
+    "Boston Braves": "보스턴 브레이브스", "Boston Bees": "보스턴 비스", "Milwaukee Braves": "밀워키 브레이브스",
+    "St. Louis Browns": "세인트루이스 브라운스", "Boston Americans": "보스턴 아메리칸스",
+    "Chicago Orphans": "시카고 오펀스", "Cincinnati Redlegs": "신시내티 레드레그스",
+    "Cleveland Blues": "클리블랜드 블루스", "Cleveland Bronchos": "클리블랜드 브롱코스",
+    "Cleveland Naps": "클리블랜드 냅스", "Cleveland Indians": "클리블랜드 인디언스",
+    "Florida Marlins": "플로리다 말린스", "Houston Colt .45's": "휴스턴 콜트 포티파이브스",
+    "Brooklyn Superbas": "브루클린 슈퍼바스", "Brooklyn Dodgers": "브루클린 다저스", "Brooklyn Robins": "브루클린 로빈스",
+    "Seattle Pilots": "시애틀 파일럿츠", "Washington Senators": "워싱턴 세내터스",
+    "New York Highlanders": "뉴욕 하이랜더스", "Baltimore Orioles": "볼티모어 오리올스",
+    "Milwaukee Brewers": "밀워키 브루어스",
+    "Philadelphia Athletics": "필라델피아 애슬레틱스", "Kansas City Athletics": "캔자스시티 애슬레틱스",
+    "Oakland Athletics": "오클랜드 애슬레틱스", "Athletics": "애슬레틱스",
+    "Philadelphia Blue Jays": "필라델피아 블루제이스", "New York Giants": "뉴욕 자이언츠",
+    "Tampa Bay Devil Rays": "탬파베이 데블레이스", "Montreal Expos": "몬트리올 엑스포스",
+}
+
+
+def team_ko(team):
+    """Lahman Teams 행 → 그해 구단 한국어 이름"""
+    return TEAM_NAME_KO.get(team["name"]) or FRANCHISE_KO.get(team["franchID"], team["name"])
+
 
 LEAGUE_KO = {"AL": "아메리칸리그", "NL": "내셔널리그"}
 

@@ -2,9 +2,13 @@
 #   GET  /api/status   → {"mode": "RAG"|"기록 검색", "players", "record_docs", "index_meta", "index_docs", "key_ready", "notice"}
 #   GET  /api/players  → {"players": [{player_id, name_ko, name_en, role, position, first_season, last_season}]}
 #   POST /api/ask      ← {"player_id": "ryuhy01", "question": "...", "compare_id": "kershcl01"(선택, F2010),
-#                         "history": [{"role": "user"|"assistant", "content": "..."}](선택, F2009 직전 대화)}
-#                      → {"answer", "sources": [{n, title, url, source}], "cited": [n, ...], "steps": [...],
+#                         "history": [{"role": "user"|"assistant", "content": "..."}](선택, F2009 직전 대화),
+#                         "mode": "ask"|"factcheck"(선택, 사실 확인 — 입력을 주장으로 보고 판정)}
+#                      → {"answer", "sources": [{n, title, url, source, text(인용 근거만 본문)}], "cited": [n, ...], "steps": [...],
 #                         "collected": [질문 시 새로 수집한 문서 제목], "mode", "elapsed"}
+#   POST /api/lab      ← {"player_id", "question", "configs": [{chunk, top_k_record, top_k_wiki, search_mode, mmr_lambda} × 2]}
+#                      → {"player_name", "queries", "results": [{config, wiki_chunks_total, wiki_redundancy, evidence, answer, cited, elapsed}], "elapsed"}
+#   POST /api/ask_stream  ← /api/ask 와 같은 요청 → NDJSON 스트림 (evidence → token … → final, B4 답변 스트리밍)
 #   POST /api/explore  ← {"condition": "통산 홈런 400개 이상인 좌타자"}   (F2011 조건 탐색, RAG 모드 전용)
 #                      → {"cards": [{player_id, name_ko, name_en, role, position, first_season, last_season, reason}],
 #                         "candidates": 후보 수, "elapsed"}
@@ -15,7 +19,7 @@ import json
 import re
 import time
 
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_GET, require_POST
 
 from chat import rag_service, search
@@ -61,6 +65,7 @@ def ask(request):
         player_id = str(body.get("player_id", "")).strip()
         question = str(body.get("question", "")).strip()
         compare_id = str(body.get("compare_id", "") or "").strip()
+        mode = "factcheck" if body.get("mode") == "factcheck" else "ask"
         history = [{"role": str(t.get("role", "")), "content": str(t.get("content", ""))[:2000]}
                    for t in (body.get("history") or [])[-10:] if isinstance(t, dict)]
     except (json.JSONDecodeError, AttributeError):
@@ -69,10 +74,13 @@ def ask(request):
         return JsonResponse({"error": "선수와 질문을 모두 입력하세요."}, status=400)
 
     start = time.time()
+    ask_mode = mode
     mode, _ = current_mode()
+    if ask_mode == "factcheck" and mode != "RAG":
+        return JsonResponse({"error": "사실 확인은 RAG 모드(GMS 키 · 색인 필요)에서만 동작합니다."}, status=503)
     try:
         if mode == "RAG":
-            result = rag_service.ask(player_id, question, compare_id, history)
+            result = rag_service.ask(player_id, question, compare_id, history, ask_mode)
         elif compare_id:
             result = search.ask_compare(player_id, compare_id, question)
         else:
@@ -84,10 +92,13 @@ def ask(request):
     numbers = {int(n) for group in CITE_PATTERN.findall(result["answer"]) for n in group.split(",") if n.strip().isdigit()}
     return JsonResponse({
         "answer": result["answer"],
-        "sources": [{k: s[k] for k in ("n", "title", "url", "source")} for s in result["sources"]],
+        # 근거 원문 미리보기(A3): 실제 인용한 근거만 본문을 함께 보낸다 (최대 1,500자)
+        "sources": [{**{k: s[k] for k in ("n", "title", "url", "source")},
+                     **({"text": s.get("text", "")[:1500]} if s["n"] in numbers else {})} for s in result["sources"]],
         "cited": sorted(numbers),
         "steps": result["steps"],
         "collected": result.get("collected", []),
+        "verdict": result.get("verdict", ""),
         "mode": mode,
         "elapsed": round(time.time() - start, 2),
     })
@@ -111,3 +122,74 @@ def explore(request):
         return JsonResponse({"error": "조건 탐색에 실패했습니다. 잠시 후 다시 시도하세요."}, status=500)
     return JsonResponse({"cards": result["cards"], "candidates": result["candidates"],
                          "elapsed": round(time.time() - start, 2)})
+
+
+@require_POST
+def lab(request):
+    """RAG 실험실 — 같은 질문을 검색 설정 2가지로 실행 (청크 크기 · Top-k · 유사도/MMR · λ)"""
+    try:
+        body = json.loads(request.body)
+        player_id = str(body.get("player_id", "")).strip()
+        question = str(body.get("question", "")).strip()
+        configs = [c for c in (body.get("configs") or []) if isinstance(c, dict)][:2]
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"error": "요청 형식이 올바르지 않습니다."}, status=400)
+    if not player_id or not question or len(configs) != 2:
+        return JsonResponse({"error": "선수 · 질문 · 설정 2개가 필요합니다."}, status=400)
+    mode, notice = current_mode()
+    if mode != "RAG":
+        return JsonResponse({"error": notice + " (실험실은 RAG 모드에서만 동작합니다)"}, status=503)
+    start = time.time()
+    try:
+        from rag.lab import run
+        result = run(player_id, question, configs)
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=404)
+    except Exception:
+        return JsonResponse({"error": "실험을 실행하지 못했습니다. 잠시 후 다시 시도하세요."}, status=500)
+    return JsonResponse({**result, "elapsed": round(time.time() - start, 2)})
+
+
+@require_POST
+def ask_stream(request):
+    """답변 스트리밍 (B4) — 한 줄에 JSON 하나(NDJSON): {"type": "evidence"|"token"|"final"|"error", ...}
+    RAG 모드에서만. 응답 형식의 final 은 /api/ask 응답과 같다."""
+    try:
+        body = json.loads(request.body)
+        player_id = str(body.get("player_id", "")).strip()
+        question = str(body.get("question", "")).strip()
+        compare_id = str(body.get("compare_id", "") or "").strip()
+        ask_mode = "factcheck" if body.get("mode") == "factcheck" else "ask"
+        history = [{"role": str(t.get("role", "")), "content": str(t.get("content", ""))[:2000]}
+                   for t in (body.get("history") or [])[-10:] if isinstance(t, dict)]
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"error": "요청 형식이 올바르지 않습니다."}, status=400)
+    if not player_id or not question:
+        return JsonResponse({"error": "선수와 질문을 모두 입력하세요."}, status=400)
+    mode, notice = current_mode()
+    if mode != "RAG":
+        return JsonResponse({"error": notice}, status=503)
+
+    def events():
+        start = time.time()
+        line = lambda obj: json.dumps(obj, ensure_ascii=False) + "\n"
+        try:
+            for kind, payload in rag_service.stream(player_id, question, compare_id, history, ask_mode):
+                if kind == "evidence":
+                    yield line({"type": "evidence", **payload})
+                elif kind == "token":
+                    yield line({"type": "token", "text": payload})
+                else:
+                    numbers = {int(n) for g in CITE_PATTERN.findall(payload["answer"]) for n in g.split(",") if n.strip().isdigit()}
+                    yield line({"type": "final", "answer": payload["answer"],
+                                "sources": [{**{k: x[k] for k in ("n", "title", "url", "source")},
+                                             **({"text": x.get("text", "")[:1500]} if x["n"] in numbers else {})} for x in payload["sources"]],
+                                "cited": sorted(numbers), "steps": payload["steps"], "collected": payload.get("collected", []),
+                                "verdict": payload.get("verdict", ""), "mode": mode, "elapsed": round(time.time() - start, 2)})
+        except Exception:
+            # 오류 추적 정보는 보내지 않는다 (NF2004)
+            yield line({"type": "error", "error": "답변을 만들지 못했습니다. 잠시 후 다시 시도하세요."})
+
+    response = StreamingHttpResponse(events(), content_type="application/x-ndjson; charset=utf-8")
+    response["Cache-Control"] = "no-cache"
+    return response
