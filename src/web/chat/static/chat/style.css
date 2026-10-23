@@ -46,7 +46,8 @@ a:hover { text-decoration: underline; }
 .top-links .soon { font-size: 13px; color: var(--ink4); }
 .top-search { margin-left: auto; }
 .top-search input {
-  width: clamp(140px, 22vw, 240px); border: 0; background: var(--fill); color: var(--ink);
+  width: clamp(140px, 22vw, 240px); border: 0; color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);   /* 페이지 배경과 구분되는 음영 (역할 슬라이더와 같은 톤) */
   border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13px; outline: none;
 }
 .top-search input:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
