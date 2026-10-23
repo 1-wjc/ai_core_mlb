@@ -80,8 +80,8 @@ def main():
         year = L.to_int(row["yearID"])
         if key and year in years and row["lgID"] in L.LEAGUES:
             years[year][key].append(person(row["playerID"], league=row["lgID"]))
-    # 마일스톤: 그해 기준을 넘은 선수 (실제 통산 기준, build/milestones.py)
-    for pid, items in MS.compute().items():
+    # 마일스톤: 그해 큰 기록(500홈런 · 3,000안타 · 300승 · 3,000탈삼진 · 500세이브 등)을 넘은 선수 (실제 통산 기준, build/milestones.py)
+    for pid, items in MS.timeline_events().items():
         for m in items:
             if m["season"] in years:
                 years[m["season"]]["milestones"].append({**person(pid), "label": m["label"]})

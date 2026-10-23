@@ -10,17 +10,17 @@
     <section class="hero player-hero">
   <div class="kicker">{{ p.primary_position }}{% if p.two_way %} · 투타겸업{% endif %} · {{ p.first_season }}–{{ p.last_season }}</div>
   <h1>{{ p.name_en }}<span class="en">{{ p.name_ko }}</span></h1>
-  <p class="lead">{{ p.throws }}{{ p.bats }} · {{ p.birth_year }}년생 · {{ p.birth_country }} · {{ p.teams|join:" / " }}</p>
+  <p class="lead">{{ p.throws }}{{ p.bats }} · {{ p.birth_year }}년생 · {{ p.birth_country }} · <span title="{{ p.teams|join:' / ' }}">{{ team_abbrs|join:" / " }}</span></p>
   <div class="chips">
-    {% if p.hall_of_fame %}<span class="chip accent">명예의 전당</span>{% endif %}
+    {% if p.hall_of_fame %}<span class="chip hof">명예의 전당</span>{% endif %}
     {% for s in p.postseason_summary %}{% if "우승" in s %}<span class="chip win">🏆 {{ s }}</span>{% endif %}{% endfor %}
-    {% if p.allstar_years %}<span class="chip">올스타 {{ p.allstar_years|length }}회</span>{% endif %}
+    {% if p.allstar_years %}<span class="chip allstar">올스타 {{ p.allstar_years|length }}회</span>{% endif %}
   </div>
   {% if p.traits %}
   <div class="chip-group"><div class="chip-label">플레이 스타일</div><div class="chips">{% for t in p.traits %}<span class="chip accent">{{ t }}</span>{% endfor %}</div></div>
   {% endif %}
   {% if p.milestones %}
-  <div class="chip-group"><div class="chip-label">기록 달성</div><div class="chips">{% for m in p.milestones %}<span class="chip win">{{ m.label }} · {{ m.season }}</span>{% endfor %}</div></div>
+  <div class="chip-group"><div class="chip-label">기록 달성</div><div class="chips">{% for m in p.milestones %}<span class="chip milestone">{{ m.label }} · {{ m.season }}</span>{% endfor %}</div></div>
   {% endif %}
   {% if p.awards %}
   <div class="chip-group"><div class="chip-label">수상</div><div class="chips">{% for a in p.awards %}<span class="chip">{{ a }}</span>{% endfor %}</div></div>
@@ -143,7 +143,7 @@
         </thead>
         <tbody>
           {% for r in t.rows %}
-          <tr><td class="sticky">{{ r.season }}</td><td>{{ r.teams }}</td>{% if kind == "post" %}<td>{{ r.rounds }}</td>{% endif %}{% for c in r.cells %}<td>{{ c }}</td>{% endfor %}</tr>
+          <tr><td class="sticky">{{ r.season }}</td><td>{{ r.teams }}</td>{% if kind == "post" %}<td>{{ r.rounds }}</td>{% endif %}{% for c in r.cells %}<td>{{ c.v }}{% if c.rank %}<span class="rank{% if c.rank == 1 %} first{% endif %}" title="{{ c.tip }}">{{ c.rank }}위</span>{% endif %}</td>{% endfor %}</tr>
           {% endfor %}
         </tbody>
       </table>
@@ -153,7 +153,8 @@
     {% endif %}
   </div>
   {% endfor %}
-  <p class="note">포스트시즌은 리그 기준값이 없어 OPS+ · ERA+ · FIP · ERA− · FIP− 를 표시하지 않습니다 · 출처 SABR Lahman Database, 지표는 로컬 계산 ·
+  <p class="note">순위 배지 = 그 시즌 리그 순위 10위 안 (1901~2025 AL · NL 전체 선수, 리그 안 기록 기준 · 비율 지표는 규정 타석 · 이닝 이상, 마우스를 올리면 대상 수) ·
+  포스트시즌은 리그 기준값이 없어 OPS+ · ERA+ · FIP · ERA− · FIP− 를 표시하지 않습니다 · 출처 SABR Lahman Database, 지표는 로컬 계산 ·
     <a href="{{ p.ko_wiki.url }}" target="_blank" rel="noopener">한국어 위키백과</a> · <a href="{{ p.en_wiki.url }}" target="_blank" rel="noopener">영어 위키백과</a></p>
 </section>
 {% endblock %}

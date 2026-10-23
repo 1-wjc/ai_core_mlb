@@ -71,6 +71,10 @@ a:hover { text-decoration: underline; }
 }
 .chip.accent { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: transparent; color: var(--accent); font-weight: 600; }
 .chip.win { background: color-mix(in srgb, var(--green) 14%, transparent); border-color: transparent; color: var(--green); font-weight: 600; }
+/* 명예의 전당 = 금빛(주황), 기록 달성 = 보라, 올스타 = 빨강 — 우승(초록) · 플레이 스타일(파랑)과 구분. 글자는 기본 글자색과 섞어 대비 확보 */
+.chip.allstar { background: color-mix(in srgb, var(--red) 11%, transparent); border-color: transparent; color: color-mix(in srgb, var(--red) 80%, var(--ink)); font-weight: 600; }
+.chip.hof { background: color-mix(in srgb, var(--orange) 16%, transparent); border-color: transparent; color: color-mix(in srgb, var(--orange) 70%, var(--ink)); font-weight: 600; }
+.chip.milestone { background: color-mix(in srgb, var(--purple) 13%, transparent); border-color: transparent; color: color-mix(in srgb, var(--purple) 85%, var(--ink)); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--accent)); flex: none; }
 컴
 /* ---------- 세그먼트 컨트롤 · 버튼 ---------- */
@@ -360,9 +364,6 @@ footer a { color: var(--ink3); }
 .career-chart svg { display: block; width: 100%; overflow: visible; }
 .chart-grid { stroke: var(--line2); stroke-width: 1; }
 .chart-axis { fill: var(--ink4); font-size: 11px; font-variant-numeric: tabular-nums; }
-.chart-milestone { stroke: var(--green); stroke-width: 1; stroke-dasharray: 3 3; }
-.chart-milestone-label { font-size: 11px; font-weight: 600; fill: var(--green); }
-.tip-ms { color: var(--green); font-weight: 600; }
 .chart-ref { stroke: var(--ink4); stroke-width: 1; }
 .chart-ref-label { fill: var(--ink3); font-size: 11px; }
 .chart-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
@@ -384,3 +385,8 @@ footer a { color: var(--ink3); }
 .cite-check li { margin-bottom: 4px; }
 .num-miss { background: transparent; color: inherit; text-decoration: underline 2px var(--orange); text-underline-offset: 3px; }
 .uncited { color: var(--ink4); }
+
+/* ---------- 시즌 리그 순위 배지 (D4) ---------- */
+.rank { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 6px; font-size: 10.5px; font-weight: 600;
+        line-height: 16px; vertical-align: 1px; background: var(--fill); color: var(--ink3); cursor: help; }
+.rank.first { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }

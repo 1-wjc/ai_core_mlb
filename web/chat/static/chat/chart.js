@@ -70,20 +70,6 @@
       el("text", { x: width - pad.r, y: Y(m.ref) - 6, "text-anchor": "end", class: "chart-ref-label" }, svg).textContent = m.refLabel;
     }
 
-    // 마일스톤 달성 시즌 — 점선 세로선 + 위쪽 작은 글자 (지표와 관계없이 항상)
-    const rowEnds = [];                                  // 글자가 겹치면 아랫줄로 (줄마다 마지막 글자 오른쪽 끝)
-    for (const p of pts) {
-      if (!p.milestones || !p.milestones.length) continue;
-      el("line", { x1: X(p.season), x2: X(p.season), y1: pad.t, y2: height - pad.b, class: "chart-milestone" }, svg);
-      const label = el("text", { x: X(p.season) + 4, class: "chart-milestone-label" }, svg);
-      label.textContent = p.milestones.join(" · ");
-      const w = label.getComputedTextLength();
-      let row = rowEnds.findIndex((end) => X(p.season) + 4 > end + 6);
-      if (row < 0) { row = rowEnds.length; rowEnds.push(0); }
-      rowEnds[row] = X(p.season) + 4 + w;
-      label.setAttribute("y", pad.t + 10 + row * 14);
-    }
-
     // 선 · 옅은 면 — 연속된 시즌끼리만 잇는다 (빈 시즌 · 표본 부족이면 끊김)
     const runs = [];
     let run = [];
@@ -111,8 +97,7 @@
       const show = () => {
         cross.setAttribute("x1", X(p.season)); cross.setAttribute("x2", X(p.season)); cross.setAttribute("visibility", "visible");
         const value = p.v === null || p.v === undefined ? "표본 부족 · 기록 없음" : m.fmt(p.v);
-        tip.innerHTML = `<strong>${p.season}</strong> <span>${p.teams || ""}</span><br>${m.label} <b>${value}</b><br><small>${(["era_plus", "so", "era"].includes(metric) ? p.ip_text : p.pa_text) || ""}</small>` +
-          (p.milestones && p.milestones.length ? `<br><small class="tip-ms">달성: ${p.milestones.join(" · ")}</small>` : "");
+        tip.innerHTML = `<strong>${p.season}</strong> <span>${p.teams || ""}</span><br>${m.label} <b>${value}</b><br><small>${(["era_plus", "so", "era"].includes(metric) ? p.ip_text : p.pa_text) || ""}</small>`;
         tip.hidden = false;
         const left = Math.min(Math.max(X(p.season) - tip.offsetWidth / 2, 0), width - tip.offsetWidth);
         tip.style.left = `${left}px`;

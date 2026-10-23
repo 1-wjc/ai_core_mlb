@@ -15,6 +15,7 @@ from rag import prompts as P
 from rag.citecheck import check as check_citations
 from rag.collector import collect_for_question
 from rag.indexer import get_collections, get_embeddings, index_wiki_files
+from rag.ranks import rank_evidence, wanted as ranks_wanted
 from rag.relative import relative_evidence, wanted as relative_wanted
 from rag.team_era import era_evidence, find_franchises
 
@@ -40,7 +41,8 @@ class State(TypedDict, total=False):
 
 @lru_cache(maxsize=1)
 def llm():
-    return ChatOpenAI(model=C.CHAT_MODEL, api_key=C.GMS_KEY, base_url=C.GMS_BASE_URL)
+    return ChatOpenAI(model=C.CHAT_MODEL, api_key=C.GMS_KEY, base_url=C.GMS_BASE_URL,
+                      timeout=C.LLM_TIMEOUT, max_retries=C.LLM_RETRIES)   # 일시적인 429 · 5xx 는 재시도
 
 
 @lru_cache(maxsize=1)
@@ -163,7 +165,7 @@ def retrieve(state: State) -> State:
     wiki_k = C.TOP_K_WIKI if len(pids) == 1 else max(1, C.TOP_K_WIKI // 2)
     evidence, collection = [], []
     metrics_found = find_metrics([question] + queries)
-    franchises_found = find_franchises([question] + queries)
+    franchises_found = find_franchises([question])   # 사용자 질문에 구단이 있을 때만 (프롬프트 1 검색어의 구단명은 제외)
     for p in pids:
         evidence.append(meta_evidence[p])
         record_filter = [{"player_id": p}, {"doc_type": {"$ne": "wiki"}}]
@@ -177,6 +179,11 @@ def retrieve(state: State) -> State:
                                include_pitching=role == "투수" or two_way)
             if era:
                 evidence.append(era)
+        # 시즌 리그 순위 (D4) — "몇 위 · 리그 1위 · 순위"를 물으면 코드로 계산한 순위 근거
+        if ranks_wanted(question):
+            rk = rank_evidence(p, names[p], years)
+            if rk:
+                evidence.append(rk)
         # 시대 보정 (D1) — 비교 질문이거나 "시대 · 리그 대비"를 물으면 리그 대비 통산 지수 근거
         if relative_wanted(question, len(pids) > 1):
             rel = relative_evidence(p)

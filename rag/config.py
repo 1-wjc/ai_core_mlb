@@ -18,7 +18,9 @@ GMS_KEY = os.environ.get("GMS_KEY", "")
 GMS_BASE_URL = os.environ.get("GMS_BASE_URL", "https://gms.ssafy.io/gmsapi/api.openai.com/v1")
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "gpt-5.4-mini")
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "text-embedding-3-large")
-EMBED_BATCH = env_int("EMBED_BATCH", 100)          # 임베딩 요청 1번에 보내는 텍스트 수
+EMBED_BATCH = env_int("EMBED_BATCH", 100)
+LLM_TIMEOUT = env_int("LLM_TIMEOUT", 60)          # GMS 호출 1회 시간 제한(초)
+LLM_RETRIES = env_int("LLM_RETRIES", 3)           # 429 · 5xx · 연결 오류 시 자동 재시도 횟수 (간격을 늘려 가며)          # 임베딩 요청 1번에 보내는 텍스트 수
 
 # ---- 청크 (F2005: 위키 문서만 청킹, 기록 문서는 1문서 = 1청크) ----
 CHUNK_SIZE = env_int("CHUNK_SIZE", 1000)
@@ -56,6 +58,7 @@ EXPLORE_MAX_PICK = env_int("EXPLORE_MAX_PICK", 12)       # 조건 탐색: 카드
 # ---- 경로 ----
 PLAYERS_PATH = os.path.join(ROOT, "data", "processed", "players.json")
 RECORD_DOCS_PATH = os.path.join(ROOT, "data", "processed", "record_docs.json")
+SEASON_RANKS_PATH = os.path.join(ROOT, "data", "processed", "season_ranks.json")   # build/04 시즌 리그 순위
 METRICS_DICT_PATH = os.path.join(ROOT, "build", "metrics.json")    # 지표 사전 (직접 작성)
 WIKI_DOCS_DIR = os.path.join(ROOT, "data", "raw", "wiki", "docs")
 WIKI_MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "wiki", "wiki_manifest.json")

@@ -29,6 +29,7 @@ def get_embeddings():
         model=C.EMBED_MODEL, api_key=C.GMS_KEY, base_url=C.GMS_BASE_URL,
         check_embedding_ctx_length=False,          # 토큰 배열 대신 문자열 그대로 보냄
         chunk_size=C.EMBED_BATCH,
+        timeout=C.LLM_TIMEOUT, max_retries=C.LLM_RETRIES,   # 일시적인 429 · 5xx 는 재시도
     )
 
 

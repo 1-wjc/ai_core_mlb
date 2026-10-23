@@ -11,14 +11,17 @@ PROJECT_DIR = BASE_DIR.parent                              # ai_core_pjt_02/
 load_dotenv(PROJECT_DIR / ".env")
 sys.path.insert(0, str(PROJECT_DIR))                     # rag 패키지 사용
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-not-for-production")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-not-for-production")   # 배포 시 .env 에 임의의 긴 문자열
 # NF2004: 기본은 DEBUG 끔 — 오류가 나도 오류 추적 페이지를 화면에 내보내지 않는다. 개발할 때만 .env 에 DJANGO_DEBUG=1
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
 # Windows 는 레지스트리 설정에 따라 .js 를 text/plain 으로 알려 주어 브라우저가 스크립트 실행을 거부한다 → 직접 지정
 mimetypes.add_type("text/javascript", ".js", True)
 mimetypes.add_type("text/css", ".css", True)
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+# 배포: 접속 주소(도메인 · IP)를 .env 의 DJANGO_ALLOWED_HOSTS 에 쉼표로 (기본은 이 PC 에서만)
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
+# https 도메인 · 다른 포트로 접속하면 POST(질문) 에 필요한 출처 — 예: https://mlb.example.com,http://10.0.0.5:8000
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 
 INSTALLED_APPS = [
     "django.contrib.staticfiles",
@@ -52,3 +55,4 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 PLAYERS_PATH = PROJECT_DIR / "data" / "processed" / "players.json"
 RECORD_DOCS_PATH = PROJECT_DIR / "data" / "processed" / "record_docs.json"
 SEASON_LEADERS_PATH = PROJECT_DIR / "data" / "processed" / "season_leaders.json"   # build/03
+SEASON_RANKS_PATH = PROJECT_DIR / "data" / "processed" / "season_ranks.json"       # build/04 시즌 리그 순위

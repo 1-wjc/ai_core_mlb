@@ -70,6 +70,19 @@ def seasons_by_player():
     return by
 
 
+@lru_cache(maxsize=1)
+def season_ranks():
+    """{player_id: {연도: {batting|pitching: {키: {rank, of, league, label, qualified}}}}} — build/04 (10위 안)"""
+    try:
+        with open(settings.SEASON_RANKS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+RANK_KEY = {"IP": "IPouts"}                            # 시즌표 열 키 → 순위 키
+
+
 def player_or_404(player_id):
     players, _ = search.load_data()
     p = players.get(player_id)
@@ -195,15 +208,22 @@ def season_table(p, post, tab):
                 groups.append((STAT_SETS[kind]["label"], len(items)))
                 columns += [(kind, i) for i in items]
     rows = []
+    ranks_by_year = season_ranks().get(p["player_id"], {}) if not post else {}
     for d in docs:
         metrics, stats = d.get("metrics") or {}, d.get("stats") or {}
+        year_ranks = ranks_by_year.get(str(d["season"]), {})
         cells = []
         for kind, (part, key, _, digits, _) in columns:
             if kind == "fielding":
                 block = {"fielding": metrics["fielding"]} if metrics.get("fielding") else None
             else:
                 block = {"stats": stats.get(kind), "metrics": metrics.get(kind)} if stats.get(kind) else None
-            cells.append(cell(block, part, key, digits))
+            r = (year_ranks.get(kind) or {}).get(RANK_KEY.get(key, key)) if block and kind != "fielding" else None
+            tip = ""
+            if r:
+                basis = (" · 규정 타석 이상" if kind == "batting" else " · 규정 이닝 이상") if r["qualified"] else ""
+                tip = f"{r['league']} {r['label']} {r['rank']}위 ({r['of']}명 중{basis})"
+            cells.append({"v": cell(block, part, key, digits), "rank": r["rank"] if r else None, "tip": tip})
         rows.append({"season": d["season"],
                      "teams": "/".join(abbrs.get((t, d["season"]), t) for t in d.get("teams", [])),   # 시즌 중 이적: NYY/LAD
                      "rounds": " → ".join(dict.fromkeys(round_label(r) for r in d.get("rounds", []))),
@@ -249,6 +269,19 @@ def season_rows(p):
             "rounds": " → ".join(dict.fromkeys(round_label(r) for r in d.get("rounds", []))),
         })
     return rows
+
+
+def team_abbr_list(p):
+    """소속 구단 약자 — 처음 뛴 순서, 그 시즌 약자 (예: CLE · MIL · NYY, 몬트리올 시절은 MON)"""
+    abbrs = team_abbrs()
+    out = []
+    for d in sorted((d for d in seasons_by_player().get(p["player_id"], []) if d["doc_type"] == "season_regular"),
+                    key=lambda d: d["season"]):
+        for t in d.get("teams", []):
+            a = abbrs.get((t, d["season"]), t)
+            if a not in out:
+                out.append(a)
+    return out
 
 
 def highlight_tiles(p):
@@ -312,9 +345,6 @@ def timeline():
 def chart_series(p):
     """커리어 그래프용 정규시즌 값 — 표본이 적은 시즌(50타석 · 10이닝 미만)은 비율 지표를 비운다"""
     abbrs = team_abbrs()
-    reached = {}
-    for m in p.get("milestones", []):                       # 그 시즌에 달성한 마일스톤 (그래프 표시선)
-        reached.setdefault(m["season"], []).append(m["label"])
     rows = []
     for d in sorted((d for d in seasons_by_player().get(p["player_id"], []) if d["doc_type"] == "season_regular"),
                     key=lambda d: d["season"]):
@@ -333,7 +363,6 @@ def chart_series(p):
             "hr": bs.get("HR") if bs else None,
             "era_plus": pm.get("ERA_plus") if outs >= 30 else None, "era": pm.get("ERA") if outs >= 30 else None,
             "so": ps.get("SO") if ps else None,
-            "milestones": reached.get(d["season"], []),
         })
     return rows
 
@@ -417,6 +446,7 @@ def player_detail(request, player_id):
     return render(request, "chat/player.html", {
         "p": p,
         "tiles": highlight_tiles(p),
+        "team_abbrs": team_abbr_list(p),
         "bat_rows": career_rows(p, BAT_ROWS, BAT_STAT_ROWS, "batting"),
         "pit_rows": career_rows(p, PIT_ROWS, PIT_STAT_ROWS, "pitching"),
         "career": career_tables(p),

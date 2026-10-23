@@ -32,3 +32,7 @@ chroma_db/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---- 제출 안내 원본 (로컬 참고용) ----
+README_제출가이드.md
+2회차_*템플릿.xlsx
