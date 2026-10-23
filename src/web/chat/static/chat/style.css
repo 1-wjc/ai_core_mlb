@@ -76,7 +76,7 @@ a:hover { text-decoration: underline; }
 .chip.hof { background: color-mix(in srgb, var(--orange) 16%, transparent); border-color: transparent; color: color-mix(in srgb, var(--orange) 70%, var(--ink)); font-weight: 600; }
 .chip.milestone { background: color-mix(in srgb, var(--purple) 13%, transparent); border-color: transparent; color: color-mix(in srgb, var(--purple) 85%, var(--ink)); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--accent)); flex: none; }
-컴
+
 /* ---------- 세그먼트 컨트롤 · 버튼 ---------- */
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; }
 .segmented { display: inline-flex; background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 10px; padding: 2px; }
