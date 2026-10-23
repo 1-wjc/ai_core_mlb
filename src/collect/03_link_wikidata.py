@@ -17,7 +17,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from env import contact
+from env import contact, data_dir
 
 SPARQL_URL = "https://query.wikidata.org/sparql"
 KO_API_URL = "https://ko.wikipedia.org/w/api.php"
@@ -26,8 +26,9 @@ BATCH = 200          # SPARQL 한 번에 조회할 ID 수
 MIN_KO_BYTES = 3000  # 한국어 문서 "약 1,000자 이상" 기준 (한글 1자 ≈ 3바이트)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CHADWICK_PATH = os.path.join(BASE_DIR, "..", "data", "raw", "chadwick", "people_mlb.csv")
-SAVE_DIR = os.path.join(BASE_DIR, "..", "data", "raw", "wikidata")
+DATA_DIR = data_dir()                              # 프로젝트 루트의 data/ (collect/env.py)
+CHADWICK_PATH = os.path.join(DATA_DIR, "raw", "chadwick", "people_mlb.csv")
+SAVE_DIR = os.path.join(DATA_DIR, "raw", "wikidata")
 
 
 def get_json(url, params):

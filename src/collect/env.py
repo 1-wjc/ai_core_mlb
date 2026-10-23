@@ -3,7 +3,7 @@
 
 import os
 
-ENV_PATH = os.path.join(os.path.dirname(__file__), "..", ".env")
+ENV_PATH = os.path.join(os.path.dirname(__file__), "..", ".env")          # src/.env
 
 
 def load_env():
@@ -18,10 +18,16 @@ def load_env():
             os.environ.setdefault(key.strip(), value.strip())
 
 
+def data_dir():
+    """수집 데이터 폴더 — 프로젝트 루트(src 의 부모)의 data/. .env 의 DATA_DIR 로 바꿀 수 있음"""
+    load_env()
+    return os.environ.get("DATA_DIR") or os.path.join(os.path.dirname(__file__), "..", "..", "data")
+
+
 def contact():
     """위키 · 데이터 API User-Agent 에 넣을 연락처 (NF2006). .env 의 WIKI_CONTACT"""
     load_env()
     value = os.environ.get("WIKI_CONTACT", "")
     if not value:
-        raise SystemExit(".env 에 WIKI_CONTACT(연락처 이메일)를 넣어 주세요. .env.example 참고")
+        raise SystemExit(".env 에 WIKI_CONTACT(연락처 이메일)를 넣어 주세요. .env.sample 참고")
     return value

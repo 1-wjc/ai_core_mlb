@@ -16,7 +16,7 @@ import re
 import time
 import urllib.request
 
-from env import contact
+from env import contact, data_dir
 
 SHARED_NAME = "y1prhc795jk8zvmelfd3jq7tl389y6cd"          # SABR 페이지의 CSV 공유 링크 ID
 FOLDER_URL = "https://sabr.box.com/s/" + SHARED_NAME
@@ -44,7 +44,8 @@ NEED_FILES = [
 ]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SAVE_DIR = os.path.join(BASE_DIR, "..", "data", "raw", "lahman")
+DATA_DIR = data_dir()                              # 프로젝트 루트의 data/ (collect/env.py)
+SAVE_DIR = os.path.join(DATA_DIR, "raw", "lahman")
 
 
 def fetch(url):

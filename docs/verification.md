@@ -3,6 +3,7 @@
 > AI 코어 프로젝트 2회차 · 명세서 4장 확인 항목별 실행 결과 · 실행일 2026-10-22
 > 표기: ✅ 통과 · ❌ 실패 · ⏳ 미확인. 화면 캡처는 `docs/images/verify/`.
 > 실행 환경: 색인 `player_meta` 2,047 · `player_docs` 86,407(검증 중 질문 시 수집으로 86,482), 채팅 `gpt-5.4-mini`, 임베딩 `text-embedding-3-large`, Django DEBUG 꺼짐
+> 코드 경로는 `src/` 기준 (예: `rag/graph.py` = `src/rag/graph.py`), 데이터는 프로젝트 루트의 `data/`.
 
 ---
 
@@ -93,7 +94,7 @@ graph TD;
 |---|---|---|
 | NF2001 대표 질문 처리 시간 | ✅ | 측정(10/22): 일반 질문 6~18초(비교 5.8 · 사실 확인 4.0~16.3 · ERA/FIP 12.2 · 구단 합산 17.9), 조건 탐색 0.2~0.9초(규칙) / 3~25초(LLM 판정). 근거 목록은 스트리밍으로 먼저 표시. **질문 시 보충 수집이 일어나는 질문은 41~46초** — 근거가 부족할 때만 수집 |
 | NF2002 이미 수집한 검색어 재수집 안 함 | ✅ | 4.2 세 번째 질문 — 수집 단계 없음. manifest 검색어 · 문서 ID로 판단, 색인은 같은 청크 재임베딩 안 함(4.1) |
-| NF2003 소스 · 제출물에 API 키 없음 | ✅ | 저장소 대상 파일 전체에서 키 패턴 · 연락처 검색 → 발견 없음. `.env` · `data/` · `chroma_db/`는 `.gitignore`로 제외 (`git check-ignore` 확인), 저장소에는 `.env.example`만 |
+| NF2003 소스 · 제출물에 API 키 없음 | ✅ | 저장소 대상 파일 전체에서 키 패턴 · 연락처 검색 → 발견 없음. `src/.env` · `src/chroma_db/`는 `.gitignore`로 제외 (`git check-ignore` 확인), 저장소에는 `src/.env.sample`만 |
 | NF2004 화면에 키 · 프롬프트 전문 · 오류 추적 정보 없음 | ✅ | 없는 주소 → 일반 404 페이지 (`4-7_404.png`). API 잘못된 요청 → `{"error": "요청 형식이 올바르지 않습니다."}` 400, 빈 질문 400, GET 405 — 모두 일반 문구. 응답에 프롬프트 · 키 없음. Django DEBUG 기본 꺼짐 |
 | NF2005 모듈 분리 | ✅ | `collect/`(수집) · `build/`(정규화 · 지표 계산 · 한국어 표기) · `rag/indexer.py`(색인) · `rag/graph.py`(검색 · 생성) · `rag/prompts.py`(프롬프트) · `web/`(UI) |
 | NF2006 재시도 · 호출 간격 · 식별 정보 | ✅ | 모든 위키 · Wikidata 호출 User-Agent에 연락처(`.env`), 요청 간 대기(Wikidata 0.3~1초 · 위키백과 0.4초), 429 · 5xx는 Retry-After를 따라 최대 4회 재시도 (`collect/04` · `rag/collector.py`). GMS(채팅 · 임베딩) 호출은 시간 제한 60초 · 일시 오류 재시도 3회 (`rag/config.py` `LLM_TIMEOUT` · `LLM_RETRIES`) |
@@ -176,10 +177,10 @@ graph TD;
 | 필수 기능 F2001 ~ F2012 모두 동작 | ✅ |
 | 선택한 심화 기능(F2013 ~ F2016) 동작 · 필수 결과와 비교 | ✅ 위 비교표 |
 | 증명용 스크린샷 첨부 | ✅ `docs/images/verify/` 19장 (4장 확인 항목 14 · 추가 기능 5) |
-| 요구사항 정의서 · RAG 파이프라인 설계문서 · 소스코드 · README | ✅ `docs/requirements.md` · `docs/rag_design.md` · 저장소 · `README.md` |
+| 요구사항 정의서 · RAG 파이프라인 설계문서 · 소스코드 · README | ✅ `docs/requirements.md` · `RAG_파이프라인_설계문서.md` · 저장소 · `README.md` |
 | 검증 결과 — 요구사항 대조표 · 테스트 결과표 | ✅ 이 문서 |
 | 검증 결과 — 셀프 · 상호 체크리스트 | ⏳ 3일차 제공 양식 대기 |
-| 수집 데이터 제출 | ⏳ 제출 방식 결정 대기 (`data/` 129MB · zip 약 33MB, 색인 `chroma_db/`는 스크립트로 재생성) |
+| 수집 데이터 제출 | ✅ 제출 저장소에 `data/` 포함 (129MB, raw · processed). 색인 `src/chroma_db/`(1.5GB)는 용량 때문에 제외하고 `python -m rag.indexer --all`로 생성 |
 
 ## 화면 캡처 목록
 

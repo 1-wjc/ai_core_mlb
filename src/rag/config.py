@@ -5,7 +5,7 @@ import os
 
 from dotenv import load_dotenv
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # src/ (.env · chroma_db 위치)
 load_dotenv(os.path.join(ROOT, ".env"))
 
 
@@ -56,12 +56,14 @@ EXPLORE_CANDIDATES = env_int("EXPLORE_CANDIDATES", 40)   # 조건 탐색: 메타
 EXPLORE_MAX_PICK = env_int("EXPLORE_MAX_PICK", 12)       # 조건 탐색: 카드로 보여 줄 최대 선수 수
 
 # ---- 경로 ----
-PLAYERS_PATH = os.path.join(ROOT, "data", "processed", "players.json")
-RECORD_DOCS_PATH = os.path.join(ROOT, "data", "processed", "record_docs.json")
-SEASON_RANKS_PATH = os.path.join(ROOT, "data", "processed", "season_ranks.json")   # build/04 시즌 리그 순위
+# 수집 데이터 폴더 — 프로젝트 루트(src 의 부모)의 data/. .env 의 DATA_DIR 로 바꿀 수 있음
+DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(os.path.dirname(ROOT), "data")
+PLAYERS_PATH = os.path.join(DATA_DIR, "processed", "players.json")
+RECORD_DOCS_PATH = os.path.join(DATA_DIR, "processed", "record_docs.json")
+SEASON_RANKS_PATH = os.path.join(DATA_DIR, "processed", "season_ranks.json")   # build/04 시즌 리그 순위
 METRICS_DICT_PATH = os.path.join(ROOT, "build", "metrics.json")    # 지표 사전 (직접 작성)
-WIKI_DOCS_DIR = os.path.join(ROOT, "data", "raw", "wiki", "docs")
-WIKI_MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "wiki", "wiki_manifest.json")
+WIKI_DOCS_DIR = os.path.join(DATA_DIR, "raw", "wiki", "docs")
+WIKI_MANIFEST_PATH = os.path.join(DATA_DIR, "raw", "wiki", "wiki_manifest.json")
 CHROMA_DIR = os.path.join(ROOT, "chroma_db")
 
 # ---- 컬렉션 (2개) ----

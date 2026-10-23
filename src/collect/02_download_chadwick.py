@@ -20,7 +20,7 @@ import os
 import time
 import urllib.request
 
-from env import contact
+from env import contact, data_dir
 
 RAW_URL = "https://raw.githubusercontent.com/chadwickbureau/register/master/data/people-{}.csv"
 HEADERS = {"User-Agent": f"AICoreProject/0.1 ({contact()})"}
@@ -31,8 +31,9 @@ LAST_SEASON = 2025
 LEAGUES = ["AL", "NL"]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LAHMAN_DIR = os.path.join(BASE_DIR, "..", "data", "raw", "lahman")
-SAVE_DIR = os.path.join(BASE_DIR, "..", "data", "raw", "chadwick")
+DATA_DIR = data_dir()                              # 프로젝트 루트의 data/ (collect/env.py)
+LAHMAN_DIR = os.path.join(DATA_DIR, "raw", "lahman")
+SAVE_DIR = os.path.join(DATA_DIR, "raw", "chadwick")
 
 
 def read_csv(path):

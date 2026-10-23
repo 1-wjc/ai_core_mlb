@@ -56,6 +56,6 @@
 
 ## 5. 재현 방법
 
-- RAG 사용: `python -m scripts.ask <선수ID> "<질문>"` (예: `python -m scripts.ask pelhacd01 "2018년 시즌 등판 수, 이닝, 평균자책점, FIP는?"`)
+- RAG 사용 (`src/`에서 실행): `python -m scripts.ask <선수ID> "<질문>"` (예: `python -m scripts.ask pelhacd01 "2018년 시즌 등판 수, 이닝, 평균자책점, FIP는?"`)
 - RAG 없이: 같은 모델에 위 1장의 시스템 프롬프트 + `선수: <이름>\n질문: <질문>` 을 보냄
 - 정답 값: `data/processed/record_docs.json` 의 `rec:<선수ID>:<연도>:regular|post`, `rec:team:<팀ID>:<연도>` 문서

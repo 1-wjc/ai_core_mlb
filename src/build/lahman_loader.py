@@ -10,10 +10,12 @@ import csv
 import os
 import re
 
-BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-RAW_DIR = os.path.join(BASE_DIR, "data", "raw")
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")      # src/
+# 수집 데이터 폴더 — 프로젝트 루트(src 의 부모)의 data/. 환경변수 DATA_DIR 로 바꿀 수 있음
+DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(BASE_DIR, "..", "data")
+RAW_DIR = os.path.join(DATA_DIR, "raw")
 LAHMAN_DIR = os.path.join(RAW_DIR, "lahman")
-PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
+PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
 
 FIRST_SEASON = 1901
 LAST_SEASON = 2025

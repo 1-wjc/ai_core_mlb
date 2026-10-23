@@ -6,13 +6,30 @@
 | 제출물 | 위치 |
 |---|---|
 | 1. 요구사항 정의서 | [`docs/requirements.md`](docs/requirements.md) |
-| 2. RAG 파이프라인 설계문서 | [`docs/rag_design.md`](docs/rag_design.md) |
+| 2. RAG 파이프라인 설계문서 | [`RAG_파이프라인_설계문서.md`](RAG_파이프라인_설계문서.md) |
 | 3. 검증 결과 (확인 항목별 결과 · 요구사항 대조표 · 테스트 결과표 · 화면 캡처) | [`docs/verification.md`](docs/verification.md) · [`docs/images/verify/`](docs/images/verify/) |
 | RAG 사용 전후 비교 (F2015) | [`docs/rag_comparison.md`](docs/rag_comparison.md) |
-| 4. 구현 소스코드 | 수집 `collect/` · 정규화 · 지표 `build/` · 색인 · 검색 · 생성 `rag/` · 화면 `web/` · CLI `scripts/` |
-| 5. 셀프 · 상호 체크리스트 | 양식 받은 뒤 작성 |
+| 4. 구현 소스코드 · 수집 데이터 | [`src/`](src/) (수집 `collect/` · 정규화 · 지표 `build/` · 색인 · 검색 · 생성 `rag/` · 화면 `web/` · CLI `scripts/`) · [`data/`](data/) |
+| 5. 셀프 · 상호 체크리스트 | `체크리스트/` |
 | 6. README | 이 문서 (실행 방법 2장 · 이용 흐름별 기능 설명 3장(필수 · 심화 · 추가 구분 표시) · 데이터 준비 4장 · 데이터 출처와 이용 조건 5장) |
 | 개발 기록 | [`docs/progress_log.md`](docs/progress_log.md) (결정 로그) |
+
+```
+.
+├── README.md
+├── RAG_파이프라인_설계문서.md
+├── data/                 수집 · 가공 데이터 (raw: 원천 CSV · 위키 문서 / processed: 선수 · 기록 문서 JSON)
+├── src/                  실행에 필요한 모든 코드 — 명령은 이 폴더에서 실행
+│   ├── collect/          수집 (Lahman · Chadwick · Wikidata · 위키백과)
+│   ├── build/            정규화 · 지표 계산 · 한국어 표기 · 순위 · 마일스톤
+│   ├── rag/              색인 · 검색 · 생성 (LangGraph) · 프롬프트
+│   ├── web/              화면 (Django: 페이지 + JSON API)
+│   ├── scripts/          확인용 CLI
+│   ├── requirements.txt
+│   └── .env.sample       .env 로 복사해 값 채움
+├── docs/                 요구사항 정의서 · 검증 결과 · RAG 전후 비교 · 개발 기록 · 화면 캡처
+└── 체크리스트/            셀프 · 상호 체크리스트
+```
 
 ---
 
@@ -27,25 +44,27 @@ MLB 선수의 시즌 기록과 세이버메트릭스 지표, 위키백과 서술
 
 ## 2. 실행 방법
 
-Python 3.11 기준 (명세서 지정 버전 + Django).
+Python 3.11 기준 (명세서 지정 버전 + Django). **아래 명령은 모두 `src/` 폴더에서 실행.**
 
 ```bash
+cd src
 python -m venv .venv
 source .venv/Scripts/activate        # Windows Git Bash
 pip install -r requirements.txt
-cp .env.example .env                 # 값 채우기
+cp .env.sample .env                  # 값 채우기
 ```
 
-`.env` (저장소에 올리지 않음)
+`src/.env` (저장소에 올리지 않음)
 ```
 GMS_KEY=발급받은_키
 WIKI_CONTACT=your-email@example.com
 # 선택: CHAT_MODEL · EMBED_MODEL · CHUNK_SIZE · CHUNK_OVERLAP · TOP_K_RECORD · TOP_K_WIKI · PER_QUERY_K
 #       COLLECT_MODE(auto|always|off) · COLLECT_IF_DISTANCE · HISTORY_TURNS · EXPLORE_CANDIDATES (rag/config.py)
 # 선택: DJANGO_DEBUG=1 (개발 중에만. 기본은 꺼짐 → 오류 추적 정보를 화면에 보이지 않음)
+# 선택: DATA_DIR=데이터 폴더 경로 (기본: 프로젝트 루트의 data/)
 ```
 
-데이터 준비(4장) → 색인 → 화면 실행
+데이터 준비(4장, `data/`가 이미 있으면 생략) → 색인 → 화면 실행
 ```bash
 python -m rag.indexer --all                          # 전체 색인 (일부만: --players ryuhy01,troutmi01)
 python web/manage.py runserver                       # http://127.0.0.1:8000
@@ -58,7 +77,7 @@ GMS 키와 색인이 있으면 RAG 모드, 없으면 기록 검색 모드(질문
 # .env: DJANGO_SECRET_KEY · DJANGO_ALLOWED_HOSTS(접속 주소) · 필요하면 DJANGO_CSRF_TRUSTED_ORIGINS (https 도메인)
 python web/manage.py runserver 0.0.0.0:8000
 ```
-- 색인 `chroma_db/`(약 1.5GB)와 `data/`는 저장소에 없음 → 서버에서 4장 순서로 다시 만들거나(전체 색인 약 30분 · 임베딩 크레딧 사용) 이 PC에서 만든 폴더를 그대로 복사
+- 색인 `src/chroma_db/`(약 1.5GB)는 용량 때문에 저장소에 없음 → `python -m rag.indexer --all`로 생성(약 30분 · GMS 임베딩 크레딧 사용)하거나 만들어 둔 폴더를 그대로 복사
 - DEBUG는 기본 꺼짐, 정적 파일은 앱이 직접 제공 (별도 웹 서버 설정 없이 동작)
 - GMS 호출은 시간 제한 60초 · 일시 오류 시 3회 재시도 (`LLM_TIMEOUT` · `LLM_RETRIES`)
 
@@ -72,7 +91,7 @@ python -m scripts.ask --graph                                       # 그래프 
 
 ## 3. 기능 — 이용 흐름
 
-사용자가 선수를 찾고 → 기록을 보고 → 질문하는 순서로 정리. 기능마다 명세서 구분을 붙임: **[필수 F20xx]** · **[심화 F20xx]** · **[추가]** (명세서에 없고 이 서비스에서 더한 기능).
+사용자가 선수를 찾고 → 기록을 보고 → 질문하는 순서로 정리. 코드 경로는 `src/` 기준. 기능마다 명세서 구분을 붙임: **[필수 F20xx]** · **[심화 F20xx]** · **[추가]** (명세서에 없고 이 서비스에서 더한 기능).
 요구사항 번호별 정의는 [`docs/requirements.md`](docs/requirements.md), 번호별 동작 확인(실행 결과 · 수치 · 화면 캡처)은 [`docs/verification.md`](docs/verification.md).
 
 | 화면 | 주소 | 하는 일 |
@@ -169,9 +188,9 @@ Django가 화면(템플릿 + HTML · CSS · JS)과 JSON API를 나눠 제공 (St
 | 7 | `build/03_build_leaders.py` | 메인 시즌 타임라인: 연도별 홈런 · 타율 · 평균자책점 · 탈삼진 1위(MLB 전체 선수, 규정 = 그해 팀 경기 수 기준) · MVP · 사이영상 | `data/processed/season_leaders.json` |
 | 7-2 | `build/04_build_ranks.py` | 시즌 리그 순위: 1901~2025 AL · NL 전체 선수로 시즌 · 리그별 순위 (홈런 · 안타 · 타점 · 득점 · 도루 · 볼넷 · 타율 · 출루율 · 장타율 · OPS · 승 · 세이브 · 탈삼진 · 이닝 · 평균자책점 · WHIP, 서비스 선수의 10위 안만 저장) | `data/processed/season_ranks.json` |
 | 8 | `build/metrics.json` | 지표 사전 38개 (정의 · 계산식 · 해석 · 참고 위키 문서, 직접 작성) — 색인 시 외부 문서 컬렉션에 출처 "지표 사전"으로 들어감 | `build/metrics.json` |
-| 9 | `rag/indexer.py` | 색인: `player_meta` (선수 2,047) · `player_docs` (기록 44,389 + 위키 41,980 + 지표 사전 38 = 청크 86,407) | `chroma_db/` |
+| 9 | `rag/indexer.py` | 색인: `player_meta` (선수 2,047) · `player_docs` (기록 44,389 + 위키 41,980 + 지표 사전 38 = 청크 86,407) | `src/chroma_db/` |
 
-`data/` 폴더는 저장소에 포함하지 않음. 위 순서대로 스크립트를 실행하면 다시 만들어짐. `build/` 스크립트는 `build/` 폴더 안의 공용 모듈(`lahman_loader.py`, `seasons.py`, `metrics.py`, `names_ko.py`)을 사용.
+스크립트 경로는 `src/` 기준이고 결과는 프로젝트 루트의 `data/`에 저장. `data/`에는 수집 · 가공 결과가 들어 있으며, 없으면 위 순서대로 실행해 다시 만들 수 있음(수집 약 1시간 · 빌드 수 분). 색인 `src/chroma_db/`는 용량(약 1.5GB) 때문에 저장소에 포함하지 않음. `build/` 스크립트는 `build/` 폴더 안의 공용 모듈(`lahman_loader.py`, `seasons.py`, `metrics.py`, `names_ko.py`, `milestones.py`)을 사용.
 
 현재 데이터 규모
 
@@ -210,10 +229,10 @@ Django가 화면(템플릿 + HTML · CSS · JS)과 JSON API를 나눠 제공 (St
 | `data/processed/season_leaders.json` | `build/03` | Lahman | **CC BY-SA 3.0** | 연도별 부문 1위 · 수상 집계 |
 | `data/processed/season_ranks.json` | `build/04` | Lahman | **CC BY-SA 3.0** | 시즌 · 리그별 순위 집계 |
 | `build/metrics.json` (지표 사전) | 직접 작성 | 위키백과 지표 문서 참고 (링크만, 본문 복제 없음) | 프로젝트 작성물 | 정의 · 계산식 · 해석을 직접 서술 |
-| `chroma_db/` (색인) | `rag/indexer.py` | 위 전체 | 각 청크의 원 출처 라이선스 | 청킹 · 임베딩 |
+| `src/chroma_db/` (색인, 저장소 제외) | `rag/indexer.py` | 위 전체 | 각 청크의 원 출처 라이선스 | 청킹 · 임베딩 |
 
 - **동일 조건 변경 허락(SA)**: Lahman · 위키백과를 가공한 데이터는 공유할 때 같은 CC BY-SA 라이선스로 공유해야 함.
 - **출처 표시**: 화면 하단과 답변 근거에 출처(Lahman · 위키백과 문서 제목과 URL)와 라이선스를 표시.
-- **저장소 배포 범위**: `data/`와 `chroma_db/`는 저장소에 포함하지 않음. 저장소에는 데이터를 받고 가공하는 코드만 있고, 데이터는 각 출처에서 직접 받아 만듦.
+- **저장소 배포 범위**: 수집 · 가공 데이터(`data/`)는 위 이용 조건(출처 표시 · 동일 조건 공유)에 따라 포함. 색인 `src/chroma_db/`는 용량 때문에 제외하고 스크립트로 생성. 각 데이터는 원 출처의 라이선스를 따름.
 - **이용 예절 (NF2006)**: 위키백과 · Wikidata API 호출 시 User-Agent에 연락처(`.env`의 `WIKI_CONTACT`)를 넣고, 요청 사이에 대기 (Wikidata 0.3~1초, 위키백과 0.4초). 위키백과 수집은 429 · 5xx 응답 시 Retry-After를 따라 최대 4회 재시도. 한 번 수집한 문서는 manifest로 관리해 다시 받지 않음 (NF2002).
 - **사용하지 않은 출처**: KBO 공식 사이트 · 스탯티즈(자동 수집 금지), Baseball-Reference · FanGraphs · Baseball Savant(대량 수집 · 재배포 제한).

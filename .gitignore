@@ -1,7 +1,7 @@
 # ---- 비밀 정보 (NF2003: API 키는 환경변수로, 저장소에 포함하지 않음) ----
 .env
 .env.*
-!.env.example
+!.env.sample
 
 # ---- Python ----
 __pycache__/
@@ -10,13 +10,13 @@ __pycache__/
 venv/
 .ipynb_checkpoints/
 
-# ---- 데이터 (collect/ → build/ 스크립트로 다시 만들 수 있음) ----
+# ---- 데이터 (src/collect → src/build 스크립트로 다시 만들 수 있음) ----
 # 원천(data/raw) · 정규화 결과(data/processed) · 색인(data/index)
 data/
 
 # ---- 프로젝트에 사용하지 않는 것 ----
 # 화면 백업 (초기 화면 · 디자인 시안 v2~v4)
-web/_backup/
+src/web/_backup/
 # 제공 영화 도메인 팩과 그 분석 스크립트
 영화도메인_데이터/
 analysis/

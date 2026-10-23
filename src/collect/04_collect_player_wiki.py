@@ -25,7 +25,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from env import contact
+from env import contact, data_dir
 
 HEADERS = {"User-Agent": f"AICoreProject/0.1 ({contact()}) python-urllib"}
 SLEEP = 0.4               # 요청 사이 대기 (초)
@@ -36,8 +36,9 @@ CUT_SECTIONS_EN = ["References", "External links", "See also", "Further reading"
 CUT_SECTIONS_KO = ["각주", "외부 링크", "같이 보기", "참고 문헌", "참조", "주해", "출처"]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_PATH = os.path.join(BASE_DIR, "..", "data", "raw", "wikidata", "players_wikidata.csv")
-WIKI_DIR = os.path.join(BASE_DIR, "..", "data", "raw", "wiki")
+DATA_DIR = data_dir()                              # 프로젝트 루트의 data/ (collect/env.py)
+INPUT_PATH = os.path.join(DATA_DIR, "raw", "wikidata", "players_wikidata.csv")
+WIKI_DIR = os.path.join(DATA_DIR, "raw", "wiki")
 DOCS_DIR = os.path.join(WIKI_DIR, "docs")
 MANIFEST_PATH = os.path.join(WIKI_DIR, "wiki_manifest.json")
 

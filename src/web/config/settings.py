@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent          # web/
-PROJECT_DIR = BASE_DIR.parent                              # ai_core_pjt_02/
+PROJECT_DIR = BASE_DIR.parent                              # src/ (.env · rag 패키지)
 load_dotenv(PROJECT_DIR / ".env")
 sys.path.insert(0, str(PROJECT_DIR))                     # rag 패키지 사용
 
@@ -52,7 +52,9 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # 데이터 경로 (data/ 는 collect → build 스크립트로 생성)
-PLAYERS_PATH = PROJECT_DIR / "data" / "processed" / "players.json"
-RECORD_DOCS_PATH = PROJECT_DIR / "data" / "processed" / "record_docs.json"
-SEASON_LEADERS_PATH = PROJECT_DIR / "data" / "processed" / "season_leaders.json"   # build/03
-SEASON_RANKS_PATH = PROJECT_DIR / "data" / "processed" / "season_ranks.json"       # build/04 시즌 리그 순위
+# 수집 데이터 폴더 — 프로젝트 루트(src 의 부모)의 data/. .env 의 DATA_DIR 로 바꿀 수 있음
+DATA_DIR = Path(os.environ.get("DATA_DIR") or PROJECT_DIR.parent / "data")
+PLAYERS_PATH = DATA_DIR / "processed" / "players.json"
+RECORD_DOCS_PATH = DATA_DIR / "processed" / "record_docs.json"
+SEASON_LEADERS_PATH = DATA_DIR / "processed" / "season_leaders.json"   # build/03
+SEASON_RANKS_PATH = DATA_DIR / "processed" / "season_ranks.json"       # build/04 시즌 리그 순위
